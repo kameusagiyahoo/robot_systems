@@ -1,47 +1,17 @@
 import {SKILL_LEARNING_REGISTRY,skillLearningState,learningSummary} from './src/learning/skill_learning_registry.js';
 
 const $=s=>document.querySelector(s);
-function controllerLabel(){const v=$('#controllerSelect')?.value||'pure_pursuit';return{pure_pursuit:'PurePursuit',rule_waypoint:'Rule',pid_path:'PID'}[v]||v}
-function evalLabel(skill){const e=skillLearningState(skill.id).evaluation;return e?`${Math.round((e.successRate||0)*100)}%`:'未評価'}
-function methodFor(skill){
-  const state=skillLearningState(skill.id),score=evalLabel(skill);
-  let method;
-  if(state.policy==='learned'&&state.trained)method=state.model?.algorithm==='behavior_cloning'?'BC':'Learned';
-  else if(skill.id==='navigate_to_pallet'||skill.id==='navigate_to')method=controllerLabel();
-  else method=skill.defaultPolicy.replace(' / ','/');
-  return `${method} · ${score}`;
+function currentController(){return $('#controllerSelect')?.value||'pure_pursuit'}
+function controllerLabel(){const v=currentController();return{pure_pursuit:'PurePursuit',rule_waypoint:'Rule',pid_path:'PID'}[v]||v}
+function evalLabel(skill){
+  const e=skillLearningState(skill.id).evaluation;if(!e)return'未評価';
+  if((skill.id==='navigate_to_pallet'||skill.id==='navigate_to')&&e.controller!==currentController())return'未評価';
+  return`${Math.round((e.successRate||0)*100)}%`;
 }
-function learningLabel(skill){
-  const s=skillLearningState(skill.id);
-  if(!skill.trainable)return skill.group==='perception'?'画像待ち':'固定';
-  if(s.trained)return s.policy==='learned'?'学習ON':'学習済';
-  return'未学習';
-}
+function methodFor(skill){const state=skillLearningState(skill.id),score=evalLabel(skill);let method;if(state.policy==='learned'&&state.trained)method=state.model?.algorithm==='behavior_cloning'?'BC':'Learned';else if(skill.id==='navigate_to_pallet'||skill.id==='navigate_to')method=controllerLabel();else method=skill.defaultPolicy.replace(' / ','/');return`${method} · ${score}`}
+function learningLabel(skill){const s=skillLearningState(skill.id);if(!skill.trainable)return skill.group==='perception'?'画像待ち':'固定';if(s.trained)return s.policy==='learned'?'学習ON':'学習済';return'未学習'}
 function statusText(v){return{pending:'未',current:'実行',success:'OK',failed:'NG'}[v]||v}
-function parseStatuses(){
-  const state=Object.fromEntries(SKILL_LEARNING_REGISTRY.map(s=>[s.id,'pending']));let current=null;
-  document.querySelectorAll('#log .log-line').forEach(line=>{
-    const text=line.innerText,m=text.match(/(?:Planner|Replan recovery)\s*→\s*([a-z_]+)/i);
-    if(m&&state[m[1]]!==undefined){current=m[1];state[current]='current';return}
-    if(/Result\s*→\s*success/i.test(text)&&current){state[current]='success';current=null;return}
-    if(/Result\s*→\s*failed/i.test(text)&&current){state[current]='failed';current=null}
-  });
-  return state;
-}
-function renderPipeline(){
-  const host=$('#taskPipeline');if(!host)return;
-  const states=parseStatuses();host.innerHTML='';
-  SKILL_LEARNING_REGISTRY.forEach(skill=>{
-    const state=states[skill.id],learn=skillLearningState(skill.id),card=document.createElement('div');
-    card.className=`pipeline-skill ${state}`;card.dataset.skill=skill.id;card.title=`${skill.order}. ${skill.code} / ${skill.desc} / 評価 ${evalLabel(skill)}`;
-    const action=`<a class="skill-learn-link${skill.trainable?'':' muted'}" href="./learn.html?skill=${encodeURIComponent(skill.id)}">${learn.trained?'管理':'詳細'}</a>`;
-    card.innerHTML=`<div class="skill-order">${skill.order}</div><div class="skill-main"><strong>${skill.order}. ${skill.label}</strong><span class="skill-desc">${skill.desc}</span><div class="skill-meta"><span>${methodFor(skill)}</span><span>${learningLabel(skill)}</span></div></div><div class="skill-side"><span class="pipeline-status ${state}">${statusText(state)}</span>${action}</div>`;
-    host.appendChild(card);
-  });
-  const task=$('#taskInput')?.value?.trim();if($('#pipelineTaskName'))$('#pipelineTaskName').textContent=task||'パレット搬送';
-  const all=learningSummary(),trainable=all.filter(x=>x.trainable).length,trained=all.filter(x=>x.trained).length,evaluated=all.filter(x=>x.evaluation).length;
-  if($('#pipelineLearnedSummary'))$('#pipelineLearnedSummary').textContent=`学習 ${trained}/${trainable}・評価 ${evaluated}/${all.length}`;
-  window.dispatchEvent(new CustomEvent('pipeline:model',{detail:{summary:all}}));
-}
+function parseStatuses(){const state=Object.fromEntries(SKILL_LEARNING_REGISTRY.map(s=>[s.id,'pending']));let current=null;document.querySelectorAll('#log .log-line').forEach(line=>{const text=line.innerText,m=text.match(/(?:Planner|Replan recovery)\s*→\s*([a-z_]+)/i);if(m&&state[m[1]]!==undefined){current=m[1];state[current]='current';return}if(/Result\s*→\s*success/i.test(text)&&current){state[current]='success';current=null;return}if(/Result\s*→\s*failed/i.test(text)&&current){state[current]='failed';current=null}});return state}
+function renderPipeline(){const host=$('#taskPipeline');if(!host)return;const states=parseStatuses();host.innerHTML='';SKILL_LEARNING_REGISTRY.forEach(skill=>{const state=states[skill.id],learn=skillLearningState(skill.id),card=document.createElement('div');card.className=`pipeline-skill ${state}`;card.dataset.skill=skill.id;card.title=`${skill.order}. ${skill.code} / ${skill.desc} / 評価 ${evalLabel(skill)}`;const action=`<a class="skill-learn-link${skill.trainable?'':' muted'}" href="./learn.html?skill=${encodeURIComponent(skill.id)}">${learn.trained?'管理':'詳細'}</a>`;card.innerHTML=`<div class="skill-order">${skill.order}</div><div class="skill-main"><strong>${skill.order}. ${skill.label}</strong><span class="skill-desc">${skill.desc}</span><div class="skill-meta"><span>${methodFor(skill)}</span><span>${learningLabel(skill)}</span></div></div><div class="skill-side"><span class="pipeline-status ${state}">${statusText(state)}</span>${action}</div>`;host.appendChild(card)});const task=$('#taskInput')?.value?.trim();if($('#pipelineTaskName'))$('#pipelineTaskName').textContent=task||'パレット搬送';const all=learningSummary(),trainable=all.filter(x=>x.trainable).length,trained=all.filter(x=>x.trained).length,evaluated=all.filter(x=>x.evaluation).length;if($('#pipelineLearnedSummary'))$('#pipelineLearnedSummary').textContent=`学習 ${trained}/${trainable}・評価 ${evaluated}/${all.length}`;window.dispatchEvent(new CustomEvent('pipeline:model',{detail:{summary:all}}))}
 function install(){renderPipeline();const log=$('#log');if(log)new MutationObserver(renderPipeline).observe(log,{childList:true,subtree:true});$('#controllerSelect')?.addEventListener('change',renderPipeline);$('#taskInput')?.addEventListener('input',renderPipeline);$('#resetBtn')?.addEventListener('click',()=>setTimeout(renderPipeline,0));window.addEventListener('storage',renderPipeline);window.addEventListener('focus',renderPipeline)}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
