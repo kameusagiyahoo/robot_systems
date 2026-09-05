@@ -21,116 +21,52 @@ Skill
 
 ## Core extension points
 
-### `SkillLearningPlugin`
+`SkillLearningPlugin` (`src/learning/framework/skill_learning_plugin.js`) はSkillごとに以下を提供できる。
 
-`src/learning/framework/skill_learning_plugin.js`
-
-Pluginは以下を提供できる。
-
-- capabilities
-  - trainable
-  - evaluable
-  - runtimeLearning
-  - demonstrationRecording
-  - available policies
+- capabilities: trainable / evaluable / runtimeLearning / demonstrationRecording / policies
 - algorithms
-- dataset schema
-- Dataset Adapter
+- dataset schema / Dataset Adapter
 - Demonstration Recorder Adapter
-- Training Backend
-- training parameters
-- evaluation parameters
-- evaluation metrics
+- Training Backend / training parameters
 - Runtime Policy Adapter
-- Evaluation Scenario Adapter
+- Evaluation Scenario Adapter / evaluation metrics
 - visualization definitions
-- `train()`
-- `evaluate()`
+- train / evaluate
 
-### Plugin Registry
-
-`src/learning/framework/plugin_registry.js`
-
-Skill IDとLearning Pluginを結び付ける。
-
-UI、Runtime Router、Skill Evaluator、Demonstration Recorder UIは具体的なBC/YOLO/ACT等を直接知らず、Registry経由でPluginを取得する。
+`plugin_registry.js` がSkill IDとPluginを結び、UI・Runtime・Evaluator・RecorderはBC/YOLO/ACT等の具体方式を直接知らない。
 
 ## Demonstration Recorder Adapter
 
 `src/learning/framework/demonstration_recorder_adapter.js`
 
-手動操作などからDatasetを作るための拡張点。
-
-現在のMotion実装:
-
-`src/learning/plugins/motion_demonstration_recorder.js`
-
-流れ:
-
 ```text
 Manual Control
   ↓
-Skill-specific Demonstration Recorder Adapter
+Skill-specific Recorder
   ↓
-Observation + Action samples
+Observation + Action
   ↓
 Dataset Adapter
-  ↓
-Manual / Recorded Dataset
   ↓
 Training Backend
 ```
 
-Motion Recorderは以下のSkillに対応する。
+現在のMotion Recorder (`motion_demonstration_recorder.js`) は NavigateToPallet / AlignToPallet / Transport / Retreat に対応し、長押し操作を約80ms周期でSamplingする。
 
-- NavigateToPallet
-- AlignToPallet
-- Transport
-- Retreat
-
-記録中は手動方向ボタンの長押しを約80ms周期でSamplingする。
-
-RecorderはSkillごとのRuntime入力表現に合わせてObservationを作る。
-
-現在のMotion observation/action:
+現在のMotion sample:
 
 ```text
-Observation
-- dx
-- dy
-- yawError
-- speed
-- steeringAngle
-
-Action
-- speed
-- steeringAngle
+Observation: dx, dy, yawError, speed, steeringAngle
+Action:      speed, steeringAngle
 ```
 
-記録停止時にまとめてMotion Dataset Adapterへ保存する。
-
-将来の例:
-
-```text
-DetectPallet
-→ Image Annotation Recorder
-
-InsertFork
-→ Camera / Depth / Robot State / Action Trajectory Recorder
-
-VLA
-→ multimodal episode recorder
-```
-
-Recorder方式もSkill Pluginごとに異なってよい。
+将来はDetectPalletなら画像Annotation Recorder、InsertForkならCamera/Depth/Robot State/Action trajectory Recorderへ差し替える。
 
 ## Training Backend
 
 `src/learning/framework/training_backend.js`
 
-重い学習処理をUI threadから分離するための拡張点。
-
-現在のMotion BCでは:
+現在のMotion BC:
 
 ```text
 Learning Page
@@ -143,45 +79,105 @@ Motion BC Training Backend
   ↓
 Web Worker
   ↓
-Pure BC training core
+BC training core
 ```
 
-を使う。
-
-関連ファイル:
+関連:
 
 - `src/learning/algorithms/motion_bc_core.js`
 - `src/learning/plugins/motion_bc_training_backend.js`
 - `src/learning/workers/motion_bc_training_worker.js`
 
-Web Workerが利用できない環境ではmain thread fallbackを行う。
+### cancellation / timeout
+
+Web Worker Training Backendは `AbortSignal` とtimeoutを受け取る。
+
+- UIから学習をキャンセル可能
+- timeout時はWorkerをterminate
+- cancel / timeout時にはmain-thread fallbackを実行しない
+- Worker自体が利用できない場合のみmain-thread fallback
+
+Motion PluginではTimeout秒数をTraining Parameterとして公開する。
 
 ## Dataset Adapter
 
 `src/learning/framework/dataset_adapter.js`
 
-Datasetの作り方をAlgorithm/UIから分離する。
+Motion実装 (`motion_dataset_adapter.js`) は以下を扱う。
 
-現在のMotion実装:
-
-`src/learning/plugins/motion_dataset_adapter.js`
-
-対応:
-
-- `synthetic_expert`
-- `manual_import`
+- synthetic expert
 - manual recorded demonstration
-- observation/action JSON import
-- portable JSON export
-- LeRobot変換用 intermediate JSON export
+- imported observation/action JSON
+- portable JSON
+- LeRobot conversion用 intermediate JSON
 
-LeRobot intermediate JSONは **公式LeRobotDatasetそのものではない**。将来、PC/Workstation側で公式LeRobotDatasetへ変換するための中間スキーマとする。
+LeRobot intermediate JSONは **公式LeRobotDatasetそのものではない**。PC/Workstation側で公式LeRobotDatasetへ変換するための中間形式である。
+
+## Model identity
+
+`src/learning/framework/model_identity.js`
+
+学習済みModelには以下を付与する。
+
+```text
+modelId
+checksum
+identityAlgorithm
+```
+
+原則SHA-256を使用し、Web Cryptoが使えない環境だけ軽量fallback hashを使う。
+
+`modelId` は例として:
+
+```text
+align_to_pallet:behavior_cloning:1a2b3c4d5e6f
+```
+
+となる。
+
+Package Import日時などのtransport metadataはModel checksum対象外とし、同一Modelは移動後も同じModel IDを維持する。
+
+Episode metadataにもModel ID/checksumを保存するため、評価結果がどのModelによるものか追跡できる。
+
+## Skill Learning Package
+
+`src/learning/framework/skill_package.js`
+
+1 Skillの研究状態を1つのJSONへまとめて持ち運ぶ。
+
+Schema:
+
+```text
+robot_systems.skill_learning_package.v1
+```
+
+内容:
+
+- Skill identity
+- Learning Plugin ID / version
+- descriptor snapshot
+- selected Policy
+- Model + Model checksum
+- Dataset metadata
+- manual/recorded Dataset payload（該当時）
+- Evaluation history
+- Package checksum
+
+Import時は:
+
+1. Package checksum検証
+2. Model checksum検証
+3. Skill ID一致確認
+4. Plugin ID一致確認
+5. Dataset / Model / Evaluation history / Policyを復元
+
+を行う。
+
+これはrobot_systems独自の研究Packageであり、LeRobotDatasetではない。
 
 ## Runtime Policy Adapter
 
 `src/learning/framework/runtime_policy_adapter.js`
-
-Learned RuntimeをRulePolicyへ直接書き込まない。
 
 ```text
 SkillExecutor
@@ -191,19 +187,17 @@ Runtime Router
   └ learned → Plugin Runtime Adapter
 ```
 
-現在のMotion BC実装:
+現在のMotion BC Runtimeは `src/learning/plugins/motion_bc_runtime.js`。
 
-`src/learning/plugins/motion_bc_runtime.js`
-
-将来、ACT / SAC / VLA / Detector Runtime等を導入するときは、原則としてRulePolicyへ学習アルゴリズム固有コードを追加しない。
+RulePolicyへBC/ACT/SAC/VLA固有Runtimeを追加しない。
 
 ## Domain Service Interface
 
 `src/learning/framework/domain_service_interface.js`
 
-Plugin RuntimeがSimulatorの内部クラスへ直接依存しないよう、必要なドメイン機能を名前付きServiceとして渡す。
+Plugin RuntimeがSimulator内部クラスへ直接依存しないよう、名前付きServiceを渡す。
 
-現在の例:
+現在:
 
 ```text
 path.to
@@ -212,127 +206,60 @@ state.get
 state.emit
 ```
 
-Motion Runtimeは `path.to` / `path.palletApproach` を要求する。
-
-Runtime Adapterは `requiredDomainServices` をDescriptorで宣言できる。
-
-これにより将来SimRobot → PiRobot / ROS2へ移行しても、Runtime Plugin側の依存境界を明確に保つ。
+将来SimRobot → PiRobot / ROS2へ移行するときもPluginの依存境界を維持する。
 
 ## Evaluation Scenario Adapter
 
 `src/learning/framework/evaluation_scenario_adapter.js`
 
-Skill評価で使う以下の内容もPlugin側の責務にする。
+Skill評価のRuntime生成・初期条件・Skill入力・trial metric・aggregateをPlugin側へ分離する。
 
-- Runtime生成
-- 初期条件生成
-- Skill入力生成
-- trial metric計測
-- aggregate
+`skill_evaluator.js` はSkill固有のscenario switchを持たない。
 
-`src/evaluation/skill_evaluator.js` はSkill固有の `switch(skillId)` を持たない。
-
-現在のフォークリフト用Scenario:
-
-`src/learning/plugins/forklift_evaluation_scenarios.js`
-
-将来Camera perceptionや3D manipulationを追加するときは、そのPlugin専用Scenario Adapterへ差し替える。
+現在のフォークリフトScenarioは `src/learning/plugins/forklift_evaluation_scenarios.js`。
 
 ## Episode reproducibility metadata
 
-Task開始時にLearning Framework状態をSnapshotする。
-
 `src/learning/framework/episode_metadata.js`
 
-Episode metaにはSkillごとに以下を保存する。
+Task開始時にSkillごとに以下をSnapshotする。
 
-- Learning Plugin ID / version
+- Plugin ID/version
 - selected Policy
-- Runtime Adapter
-- Evaluation Scenario Adapter
-- Dataset Adapter
-- Demonstration Recorder Adapter
-- Training Backend
-- Model algorithm / version / trainedAt / samples / epochs / loss
-- Dataset source / Adapter ID / version
+- Runtime / Evaluation / Dataset / Recorder / Training adapters
+- Model ID/checksum/algorithm/version/trainedAt/samples/epochs/loss
+- Dataset source/adapter/version
 
-モデル重みそのものはEpisodeへ複製しない。
-
-各Step resultには実際に使用された:
-
-- `policy`
-- `runtimePlugin`
-- `runtimeAdapter`
-
-を保存する。
+モデル重み自体はEpisodeへ複製しない。
 
 ## Current default plugins
 
-### `motion_bc`
+### motion_bc
 
-対象:
-
-- NavigateToPallet
-- AlignToPallet
-- Transport
-- Retreat
-
-現在:
+対象: NavigateToPallet / AlignToPallet / Transport / Retreat
 
 - Dataset Adapter: Motion observation/action
-- Demonstration Recorder: manual simulator operation
-- Dataset: synthetic expert / recorded or imported manual demo
+- Recorder: simulator manual demonstration
+- Dataset: synthetic / recorded / imported
 - Algorithm: Behavior Cloning
-- Training Backend: Web Worker
-- Runtime Adapter: Motion BC Runtime
-- Evaluation Scenario: Forklift Motion Scenarios
-- Evaluation: success / collision / control steps / final error (+ skill-specific metrics)
-- Visualization:
-  - training loss curve
-  - dataset distribution
-  - Classic vs Learned
+- Training: cancellable Web Worker
+- Runtime: Motion BC Runtime
+- Evaluation: Forklift Motion Scenario
+- Visualization: Loss / Dataset distribution / Classic vs Learned
 
-これは **最初の具体例** であり、Framework本体ではない。
+これはFrameworkの最初の具体例であり、Framework本体ではない。
 
-### `perception_future`
+### perception_future
 
-対象:
+DetectPallet用の将来Adapter。Camera導入後にRGB/Depth Dataset、Annotation Recorder、Detector/Segmentation/VLM、mAP/Recall/Pose Error等へ差し替える。
 
-- DetectPallet
+### manipulation_future
 
-将来:
-
-- RGB / Depth dataset adapter
-- image annotation recorder
-- Detector / Segmentation / VLM
-- perception runtime adapter
-- camera-specific evaluation scenario
-- Precision / Recall / mAP / pose error
-- detection examples / PR curve / confusion matrix
-
-### `manipulation_future`
-
-対象:
-
-- InsertForks
-- Lift
-- Place
-
-将来:
-
-- trajectory dataset adapter
-- trajectory demonstration recorder
-- BC / ACT / Diffusion Policy / RL
-- manipulation runtime adapter
-- physics/contact evaluation scenario
-- insertion success / contact / time / pose error
-- action sequence / contact map / 3D trajectory / replay
-
-現在のSimulatorは瞬時状態遷移のため、物理自由度を増やしてから具体実装する。
+InsertForks / Lift / Place用の将来Adapter。物理自由度導入後にtrajectory Recorder、ACT/Diffusion/RL、contact/trajectory評価へ差し替える。
 
 ## UI rule
 
-`learn.html` / `evaluate.html` はAlgorithm固有の項目を決め打ちしない。
+`learn.html` / `evaluate.html` はAlgorithm固有項目を決め打ちしない。
 
 ```text
 Plugin Descriptor
@@ -343,33 +270,6 @@ Dataset / Recorder / Training / Runtime / Evaluation adapters
   ↓
 Plugin-defined visualizations / metrics
 ```
-
-新しいPluginでTraining ParameterやEvaluation Metric、Recorder方式が変わっても、基本的に共通ページ本体を変更しない。
-
-## Visualization framework
-
-`src/learning/framework/visualization_renderer.js`
-
-現在:
-
-- `loss_curve`
-- `dataset_distribution`
-- `policy_comparison`
-- `capability_note`
-
-将来、Perception Pluginなら:
-
-- `pr_curve`
-- `confusion_matrix`
-- `detection_gallery`
-- `pose_error_distribution`
-
-Manipulation Pluginなら:
-
-- `trajectory_3d`
-- `action_timeline`
-- `contact_map`
-- `episode_replay`
 
 ## Important principle
 
@@ -382,28 +282,26 @@ Manipulation Pluginなら:
 
 - [x] Skill Learning Plugin interface
 - [x] Plugin Registry / Skill binding
-- [x] Dynamic training parameters
-- [x] Dynamic evaluation parameters / metrics
+- [x] Dynamic training/evaluation parameters and metrics
 - [x] Visualization Renderer registry
-- [x] Runtime Policy Adapter
-- [x] Learned Runtime routing from SkillExecutor
+- [x] Runtime Policy Adapter / Runtime Router
 - [x] Evaluation Scenario Adapter
-- [x] Skill evaluatorからscenario preparationを分離
+- [x] Dataset Adapter
+- [x] Demonstration Recorder Adapter
+- [x] Motion manual demonstration recording
 - [x] Web Worker Training Backend
-- [x] Dataset Adapter interface
-- [x] Manual observation/action JSON import
-- [x] LeRobot conversion用 intermediate JSON export
-- [x] Demonstration Recorder Adapter interface
-- [x] Motion Skill manual demonstration recorder
-- [x] long-press manual control sampling
-- [x] Plugin/Policy/Model/Dataset/Recorder metadataをEpisodeへ保存
+- [x] Worker cancellation / timeout
+- [x] portable Dataset JSON
+- [x] LeRobot conversion用 intermediate JSON
+- [x] Model ID / checksum
+- [x] Skill Learning Package import/export + integrity check
+- [x] Plugin/Policy/Model/Dataset/Recorder metadata in Episode
 - [x] Domain Service interface
 
 ## Next framework tasks
 
-- [ ] 公式LeRobotDatasetへのconverter / importer
-- [ ] Visualization Rendererのplugin-local registrationを強化
-- [ ] Plugin単位のimport/export package形式を定義
-- [ ] Worker cancellation / timeout
-- [ ] Model ID / checksumを付与して実験再現性をさらに上げる
-- [ ] demonstration episode boundaries / quality labels / DAgger support
+- [ ] 公式LeRobotDataset converter / importer (PC/Workstation side)
+- [ ] Visualization Rendererのplugin-local registration強化
+- [ ] demonstration episode boundaries / quality labels
+- [ ] DAgger / corrective demonstration workflow
+- [ ] Dataset split / validation / rollout benchmarkとの紐付け
