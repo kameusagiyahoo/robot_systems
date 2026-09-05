@@ -1,6 +1,7 @@
 import {SKILL_LEARNING_REGISTRY,skillLearningState} from './src/learning/skill_learning_registry.js';
 const $=s=>document.querySelector(s);
 
+function ensureStyles(){if(document.querySelector('link[data-skill-learning-style]'))return;const l=document.createElement('link');l.rel='stylesheet';l.href='./skill_learning.css';l.dataset.skillLearningStyle='1';document.head.appendChild(l)}
 function learningStateLabel(skill){
   const s=skillLearningState(skill.id);
   if(!skill.trainable)return skill.group==='perception'?'画像待ち':'固定ロジック';
@@ -20,6 +21,7 @@ function renderLearningList(){
 function openSheet(id){const d=document.getElementById(id);if(!d)return;if(id==='learnSheet')renderLearningList();if(typeof d.showModal==='function')d.showModal();else d.setAttribute('open','')}
 function closeSheet(d){if(!d)return;if(typeof d.close==='function')d.close();else d.removeAttribute('open')}
 function install(){
+  ensureStyles();
   document.querySelectorAll('[data-open-sheet]').forEach(btn=>btn.addEventListener('click',()=>openSheet(btn.dataset.openSheet)));
   document.querySelectorAll('[data-close-sheet]').forEach(btn=>btn.addEventListener('click',()=>closeSheet(btn.closest('dialog'))));
   document.querySelectorAll('dialog.bottom-sheet').forEach(d=>d.addEventListener('click',e=>{const r=d.getBoundingClientRect();if(e.clientY<r.top||e.clientY>r.bottom||e.clientX<r.left||e.clientX>r.right)closeSheet(d)}));
