@@ -1,0 +1,3 @@
+export function buildObservation(state){return JSON.parse(JSON.stringify({robot:state.robot,pallets:state.pallets,locations:state.locations,perception:state.perception,task:state.task,obstacle:state.obstacle,failures:state.failures}));}
+export function buildAction(step,skill,args){return{step,skill,args:JSON.parse(JSON.stringify(args||{})),timestamp:new Date().toISOString()};}
+export function buildResult(result){return{ok:!!result?.ok,reason:result?.reason||null,message:result?.message||null,timestamp:new Date().toISOString()};}
