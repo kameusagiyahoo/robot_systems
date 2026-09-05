@@ -76,6 +76,8 @@
 - [x] elapsed time metric
 - [x] control tick count
 - [x] collision count
+- [x] controller metadata
+- [x] mean cross-track error metric
 - [ ] deterministic random seed
 - [ ] batch evaluation runner
 
@@ -100,9 +102,26 @@
 - [x] collision geometry checked every control tick
 - [x] collision count in Episode metrics
 - [x] RulePolicy commands speed + steering angle instead of yaw rate directly
-- [ ] oriented rectangle vehicle collision model
-- [ ] reverse-aware path controller
-- [ ] path/waypoint representation
+
+### v1.2 — Path and vehicle geometry
+- [x] oriented rectangle vehicle collision model
+- [x] reverse-aware drive-to-target controller
+- [x] negative-speed reverse motion
+- [x] waypoint/path representation
+- [x] obstacle bypass via intermediate waypoints
+- [x] path visualization
+
+### v1.3 — Pure Pursuit baseline
+- [x] densified path representation
+- [x] lookahead point selection
+- [x] rear-steer Pure Pursuit steering law
+- [x] curvature-aware speed reduction
+- [x] Rule Waypoint / Pure Pursuit controller switch
+- [x] adjustable lookahead distance in UI
+- [x] lookahead point visualization
+- [x] mean cross-track error in Episode metrics
+- [ ] batch controller comparison
+- [ ] automatic repeated trials
 
 ## Phase 1 — Cloudflare + OpenAI Planner
 - [ ] Move deployment from GitHub Pages to Cloudflare Pages
