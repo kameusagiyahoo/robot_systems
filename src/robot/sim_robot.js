@@ -1,49 +1,9 @@
 import {RobotInterface} from './robot_interface.js';
-
-const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
-const deg2rad=d=>d*Math.PI/180;
-const rad2deg=r=>r*180/Math.PI;
-const pointInExpandedRect=(x,y,radius,rect)=>x>=rect.x-radius&&x<=rect.x+rect.w+radius&&y>=rect.y-radius&&y<=rect.y+rect.h+radius;
-
-export class SimRobot extends RobotInterface{
-  constructor(store){super();this.store=store;this.connected=false}
-  connect(){this.connected=true;return{ok:true}}
-  disconnect(){this.connected=false;return{ok:true}}
-  getObservation(){const s=this.store.state;return JSON.parse(JSON.stringify({robot:s.robot,pallets:s.pallets,locations:s.locations,task:s.task,obstacle:s.obstacle,simulation:s.simulation}))}
-  sendAction(action){
-    const s=this.store.state,r=s.robot,sim=s.simulation;
-    switch(action.type){
-      case'drive':{
-        const dt=action.dt??sim.dt;
-        const targetSpeed=clamp(action.speed??0,-sim.maxLinearSpeed,sim.maxLinearSpeed);
-        const targetSteer=clamp(action.steeringAngle??0,-sim.maxSteeringAngle,sim.maxSteeringAngle);
-        const dv=clamp(targetSpeed-r.speed,-sim.maxAcceleration*dt,sim.maxAcceleration*dt);
-        const ds=clamp(targetSteer-r.steeringAngle,-sim.maxSteeringRate*dt,sim.maxSteeringRate*dt);
-        const nextSpeed=r.speed+dv;
-        const nextSteer=r.steeringAngle+ds;
-        const yawRateRad=-(nextSpeed/sim.wheelbase)*Math.tan(deg2rad(nextSteer));
-        const nextYaw=(r.yaw+rad2deg(yawRateRad*dt)+360)%360;
-        const heading=deg2rad(nextYaw);
-        const dx=Math.cos(heading)*nextSpeed*dt,dy=Math.sin(heading)*nextSpeed*dt;
-        const nx=clamp(r.x+dx,25,875),ny=clamp(r.y+dy,25,535);
-        if(s.obstacle.enabled&&pointInExpandedRect(nx,ny,sim.robotRadius,s.obstacle)){
-          r.speed=0;r.angularVelocity=0;sim.collisions++;sim.controlTicks++;this.store.emit();
-          return{ok:false,reason:'collision_detected'};
-        }
-        r.speed=nextSpeed;r.steeringAngle=nextSteer;r.angularVelocity=rad2deg(yawRateRad);r.yaw=nextYaw;r.x=nx;r.y=ny;
-        sim.pathLength+=Math.hypot(dx,dy);sim.controlTicks++;
-        break;
-      }
-      case'move':{
-        const nx=clamp(r.x+(action.dx||0),25,875),ny=clamp(r.y+(action.dy||0),25,535);
-        if(s.obstacle.enabled&&pointInExpandedRect(nx,ny,sim.robotRadius,s.obstacle)){sim.collisions++;this.store.emit();return{ok:false,reason:'collision_detected'};}
-        sim.pathLength+=Math.hypot(nx-r.x,ny-r.y);r.x=nx;r.y=ny;break;
-      }
-      case'yaw':r.yaw=(r.yaw+(action.delta||0)+360)%360;break;
-      case'fork':r.forkRaised=!!action.raised;break;
-      case'stop':r.speed=0;r.angularVelocity=0;r.steeringAngle=0;break;
-      default:return{ok:false,reason:'unknown_action'};
-    }
-    this.store.emit();return{ok:true};
-  }
-}
+const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));const deg2rad=d=>d*Math.PI/180;const rad2deg=r=>r*180/Math.PI;
+function corners(x,y,yaw,L,W){const a=deg2rad(yaw),c=Math.cos(a),s=Math.sin(a),hx=L/2,hy=W/2;return[[hx,hy],[hx,-hy],[-hx,-hy],[-hx,hy]].map(([px,py])=>({x:x+px*c-py*s,y:y+px*s+py*c}))}
+function axes(poly){return poly.map((p,i)=>{const q=poly[(i+1)%poly.length],dx=q.x-p.x,dy=q.y-p.y,n=Math.hypot(dx,dy);return{x:-dy/n,y:dx/n}})}
+function proj(poly,a){const v=poly.map(p=>p.x*a.x+p.y*a.y);return[Math.min(...v),Math.max(...v)]}
+function overlap(a,b){return a[0]<=b[1]&&b[0]<=a[1]}
+function rectPoly(r){return[{x:r.x,y:r.y},{x:r.x+r.w,y:r.y},{x:r.x+r.w,y:r.y+r.h},{x:r.x,y:r.y+r.h}]}
+function intersects(polyA,polyB){for(const a of [...axes(polyA),...axes(polyB)])if(!overlap(proj(polyA,a),proj(polyB,a)))return false;return true}
+export class SimRobot extends RobotInterface{constructor(store){super();this.store=store;this.connected=false}connect(){this.connected=true;return{ok:true}}disconnect(){this.connected=false;return{ok:true}}getObservation(){const s=this.store.state;return JSON.parse(JSON.stringify({robot:s.robot,pallets:s.pallets,locations:s.locations,task:s.task,obstacle:s.obstacle,path:s.path,simulation:s.simulation}))}sendAction(action){const s=this.store.state,r=s.robot,sim=s.simulation;switch(action.type){case'drive':{const dt=action.dt??sim.dt,targetSpeed=clamp(action.speed??0,-sim.maxReverseSpeed,sim.maxLinearSpeed),targetSteer=clamp(action.steeringAngle??0,-sim.maxSteeringAngle,sim.maxSteeringAngle),dv=clamp(targetSpeed-r.speed,-sim.maxAcceleration*dt,sim.maxAcceleration*dt),ds=clamp(targetSteer-r.steeringAngle,-sim.maxSteeringRate*dt,sim.maxSteeringRate*dt),nextSpeed=r.speed+dv,nextSteer=r.steeringAngle+ds,yawRateRad=-(nextSpeed/sim.wheelbase)*Math.tan(deg2rad(nextSteer)),nextYaw=(r.yaw+rad2deg(yawRateRad*dt)+360)%360,heading=deg2rad(nextYaw),dx=Math.cos(heading)*nextSpeed*dt,dy=Math.sin(heading)*nextSpeed*dt,nx=clamp(r.x+dx,31,869),ny=clamp(r.y+dy,31,529);if(s.obstacle.enabled&&intersects(corners(nx,ny,nextYaw,sim.bodyLength,sim.bodyWidth),rectPoly(s.obstacle))){r.speed=0;r.angularVelocity=0;sim.collisions++;sim.controlTicks++;this.store.emit();return{ok:false,reason:'collision_detected'}}r.speed=nextSpeed;r.steeringAngle=nextSteer;r.angularVelocity=rad2deg(yawRateRad);r.yaw=nextYaw;r.x=nx;r.y=ny;sim.pathLength+=Math.hypot(dx,dy);sim.controlTicks++;break}case'fork':r.forkRaised=!!action.raised;break;case'stop':r.speed=0;r.angularVelocity=0;r.steeringAngle=0;break;default:return{ok:false,reason:'unknown_action'}}this.store.emit();return{ok:true}}}
