@@ -32,9 +32,11 @@
 
 ### v0.5 — Agent loop
 - [x] Observe → Plan → Skill → Result → State
-- [ ] Planner chooses one next Skill at a time instead of generating only a fixed full queue
-- [ ] Structured observation schema
-- [ ] Structured action/result schema
+- [x] Planner chooses one next Skill at a time instead of generating only a fixed full queue
+- [x] Structured observation schema
+- [x] Structured action/result schema
+- [x] Decision history in UI
+- [x] State-driven completion judgment
 
 ### v0.6 — Failure conditions
 - [ ] Enable obstacle collision
