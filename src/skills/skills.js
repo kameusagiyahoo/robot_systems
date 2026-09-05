@@ -1,4 +1,5 @@
 import {routeSkillRuntime} from '../learning/framework/runtime_router.js';
+import {ObjectDomainServiceProvider} from '../learning/framework/domain_service_interface.js';
 
 const skillSpecs={
   navigate_to_pallet:{pre:(s,a)=>s.pallets[a.palletId]?'ok':'pallet_not_found',post:()=>true},
@@ -16,17 +17,23 @@ const skillSpecs={
 export class SkillExecutor{
   constructor(store,policy){this.store=store;this.policy=policy}
 
+  domainServices(){
+    const policy=this.policy;
+    return new ObjectDomainServiceProvider({
+      id:'forklift_sim_domain',label:'Forklift Simulator Domain Services',version:1,
+      services:{
+        'path.to':target=>typeof policy.pathTo==='function'?policy.pathTo(target):[target],
+        'path.palletApproach':pallet=>typeof policy.palletApproachPath==='function'?policy.palletApproachPath(pallet):[{x:pallet.x-170,y:pallet.y},{x:pallet.x-125,y:pallet.y}],
+        'state.emit':()=>this.store.emit(),
+        'state.get':()=>this.store.state
+      }
+    });
+  }
+
   runtimeContext(){
     const policy=this.policy;
-    return{
-      store:this.store,
-      robot:policy.robot,
-      classicPolicy:policy,
-      services:{
-        pathTo:target=>typeof policy.pathTo==='function'?policy.pathTo(target):[target],
-        palletApproachPath:pallet=>typeof policy.palletApproachPath==='function'?policy.palletApproachPath(pallet):[{x:pallet.x-170,y:pallet.y},{x:pallet.x-125,y:pallet.y}]
-      }
-    };
+    const domainServices=this.domainServices();
+    return{store:this.store,robot:policy.robot,classicPolicy:policy,domainServices,domainServiceDescriptor:domainServices.describe()};
   }
 
   async execute(step){
