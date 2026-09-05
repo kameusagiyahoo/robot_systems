@@ -2,7 +2,7 @@
 
 物流フォークリフトを題材に、**Task → Planner → Skill → Policy → Robot → Environment** の階層構造を段階的に研究するための実験基盤です。
 
-現在は GitHub Pages 上で、連続運動シミュレーション、Skill単位の学習・評価、Classic/Learned Policy比較まで動作する静的研究基盤です。OpenAI APIなどの秘密情報はまだブラウザ側では使いません。
+現在は GitHub Pages 上で、連続運動シミュレーション、Skill単位の学習・評価、Classic/Learned Policy比較、手動Demonstration記録まで動作する静的研究基盤です。OpenAI APIなどの秘密情報はまだブラウザ側では使いません。
 
 ## Current features
 
@@ -18,11 +18,13 @@
 - Classic vs Learned comparison
 - seeded benchmark / evaluation history
 - Episode logging and JSON/CSV export
-- plugin-based **Skill Learning Framework v2.3**
+- plugin-based **Skill Learning Framework v2.4**
 - Web Worker training backend for motion BC
-- Dataset Adapter with synthetic/manual-import workflows
+- Dataset Adapter with synthetic/manual workflows
+- Skill-specific Demonstration Recorder Adapter
+- long-press manual driving → observation/action dataset
 - LeRobot conversion用 intermediate JSON export
-- Plugin/Policy/Model/Dataset metadata in Episode logs
+- Plugin/Policy/Model/Dataset/Recorder metadata in Episode logs
 - named Domain Service contracts for learned runtimes
 
 ## Architecture
@@ -56,6 +58,7 @@ Observation / Result
 ```text
 Skill
 ├ Dataset Adapter
+├ Demonstration Recorder Adapter
 ├ Training Backend
 ├ Runtime Policy Adapter
 ├ Evaluation Scenario Adapter
@@ -63,11 +66,11 @@ Skill
 └ Visualization Adapter
 ```
 
-SkillごとにDataset、Algorithm、Training Backend、Runtime、評価Scenario、評価指標、可視化を差し替えます。
+SkillごとにDataset、Demonstration Recording、Algorithm、Training Backend、Runtime、評価Scenario、評価指標、可視化を差し替えます。
 
 現在の例:
 
-- Motion Skills → Behavior Cloning plugin + Motion Dataset Adapter + Web Worker Training + Motion BC Runtime
+- Motion Skills → Behavior Cloning plugin + Motion Dataset Adapter + Manual Demo Recorder + Web Worker Training + Motion BC Runtime
 - DetectPallet → future Perception plugin
 - Insert/Lift/Place → future Manipulation plugin
 
@@ -80,6 +83,7 @@ src/learning/framework/
   skill_learning_plugin.js
   plugin_registry.js
   dataset_adapter.js
+  demonstration_recorder_adapter.js
   training_backend.js
   runtime_policy_adapter.js
   runtime_router.js
@@ -97,6 +101,7 @@ src/learning/workers/
 src/learning/plugins/
   default_skill_plugins.js
   motion_dataset_adapter.js
+  motion_demonstration_recorder.js
   motion_bc_training_backend.js
   motion_bc_runtime.js
   forklift_evaluation_scenarios.js
@@ -105,6 +110,26 @@ src/learning/ui/
   learning_page.js
   evaluation_page.js
 ```
+
+### Demonstration route
+
+```text
+Manual Control
+  ↓
+Skill Plugin
+  ↓
+Demonstration Recorder Adapter
+  ↓
+Observation + Action
+  ↓
+Dataset Adapter
+  ↓
+Manual / Recorded Dataset
+```
+
+現在は `NavigateToPallet / AlignToPallet / Transport / Retreat` を手動記録できます。
+
+研究設定のRecorderでSkillを選び、記録開始後に方向ボタンを長押しすると、約80ms周期で操作サンプルを記録します。
 
 ### Training route
 
@@ -169,6 +194,7 @@ Evaluation Scenario Adapter
 現在のMotion Dataset Adapterは以下を扱います。
 
 - synthetic expert
+- recorded manual demonstration
 - imported observation/action JSON
 - portable skill dataset JSON
 - LeRobot conversion用 intermediate JSON
