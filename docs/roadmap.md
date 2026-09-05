@@ -25,10 +25,10 @@
 
 ### v0.4 — Rule Planner
 - [x] Natural-language-like task input
-- [x] RulePlanner maps task to reusable skill sequence
+- [x] RulePlanner maps task to reusable skills
 - [x] Step / Run / Reset
-- [ ] Multiple pallet destination patterns
-- [ ] Task validation
+- [x] Pallet A/B and storage/shipping destination patterns
+- [x] Basic task validation
 
 ### v0.5 — Agent loop
 - [x] Observe → Plan → Skill → Result → State
@@ -39,17 +39,22 @@
 - [x] State-driven completion judgment
 
 ### v0.6 — Failure conditions
-- [ ] Enable obstacle collision
-- [ ] pallet not visible
-- [ ] alignment failure
-- [ ] insertion failure
-- [ ] blocked path
-- [ ] invalid task
+- [x] Failure Lab controls in UI
+- [x] Enable obstacle / blocked-path failure
+- [x] pallet not visible / forced detection failure
+- [x] alignment failure
+- [x] insertion failure
+- [x] blocked path reason
+- [x] invalid task
+- [x] Failed Skill returns a structured reason
 
 ### v0.7 — Replanning
-- [ ] Failed Skill returns reason
-- [ ] Planner consumes result and state
-- [ ] Alternate route / retry / abort
+- [x] Failed Skill returns reason
+- [ ] Planner consumes failure result and state
+- [ ] Retry policy / retry limit
+- [ ] Alternate route around obstacle
+- [ ] Recover after transient perception/alignment failure
+- [ ] Abort when recovery is impossible
 - [ ] Compare fixed Behavior Tree vs agentic replanning
 
 ## Phase 1 — Cloudflare + OpenAI Planner
