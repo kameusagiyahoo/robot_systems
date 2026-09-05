@@ -4,15 +4,15 @@
 
 学習方法を全Skillで統一しない。
 
-共通化するのは **学習の枠組み** だけで、Dataset / Algorithm / Runtime / Evaluation / Visualization はSkillごとのPluginが定義する。
+共通化するのは **学習の枠組み** だけで、Dataset / Algorithm / Training Backend / Runtime / Evaluation / Visualization はSkillごとのPluginが定義する。
 
 ```text
 Task
   ↓
 Skill
-  ├ Runtime Policy Adapter
   ├ Dataset Adapter
-  ├ Training Plugin
+  ├ Training Backend
+  ├ Runtime Policy Adapter
   ├ Evaluation Scenario Adapter
   ├ Evaluation Metrics
   └ Visualization Adapter
@@ -33,11 +33,13 @@ Pluginは以下を提供できる。
   - available policies
 - algorithms
 - dataset schema
+- Dataset Adapter
+- Training Backend
 - training parameters
 - evaluation parameters
 - evaluation metrics
-- runtime policy adapter
-- evaluation scenario adapter
+- Runtime Policy Adapter
+- Evaluation Scenario Adapter
 - visualization definitions
 - `train()`
 - `evaluate()`
@@ -49,6 +51,58 @@ Pluginは以下を提供できる。
 Skill IDとLearning Pluginを結び付ける。
 
 UI、Runtime Router、Skill Evaluatorは具体的なBC/YOLO/ACT等を直接知らず、Registry経由でPluginを取得する。
+
+## Training Backend
+
+`src/learning/framework/training_backend.js`
+
+重い学習処理をUI threadから分離するための拡張点。
+
+現在のMotion BCでは:
+
+```text
+Learning Page
+  ↓
+Motion Plugin
+  ↓
+Motion Dataset Adapter
+  ↓
+Motion BC Training Backend
+  ↓
+Web Worker
+  ↓
+Pure BC training core
+```
+
+を使う。
+
+関連ファイル:
+
+- `src/learning/algorithms/motion_bc_core.js`
+- `src/learning/plugins/motion_bc_training_backend.js`
+- `src/learning/workers/motion_bc_training_worker.js`
+
+Web Workerが利用できない環境ではmain thread fallbackを行う。
+
+## Dataset Adapter
+
+`src/learning/framework/dataset_adapter.js`
+
+Datasetの作り方をAlgorithm/UIから分離する。
+
+現在のMotion実装:
+
+`src/learning/plugins/motion_dataset_adapter.js`
+
+対応:
+
+- `synthetic_expert`
+- `manual_import`
+- observation/action JSON import
+- portable JSON export
+- LeRobot変換用 intermediate JSON export
+
+LeRobot intermediate JSONは **公式LeRobotDatasetそのものではない**。将来、PC/Workstation側で公式LeRobotDatasetへ変換するための中間スキーマとする。
 
 ## Runtime Policy Adapter
 
@@ -64,15 +118,32 @@ Runtime Router
   └ learned → Plugin Runtime Adapter
 ```
 
-`src/skills/skills.js` が `runtime_router.js` を呼び出す。
-
-現在のMotion BC実装は:
+現在のMotion BC実装:
 
 `src/learning/plugins/motion_bc_runtime.js`
 
-に分離した。
+将来、ACT / SAC / VLA / Detector Runtime等を導入するときは、原則としてRulePolicyへ学習アルゴリズム固有コードを追加しない。
 
-そのため将来、ACT / SAC / VLA / Detector Runtime等を導入するときは、原則としてRulePolicyへ学習アルゴリズム固有コードを追加しない。
+## Domain Service Interface
+
+`src/learning/framework/domain_service_interface.js`
+
+Plugin RuntimeがSimulatorの内部クラスへ直接依存しないよう、必要なドメイン機能を名前付きServiceとして渡す。
+
+現在の例:
+
+```text
+path.to
+path.palletApproach
+state.get
+state.emit
+```
+
+Motion Runtimeは `path.to` / `path.palletApproach` を要求する。
+
+Runtime Adapterは `requiredDomainServices` をDescriptorで宣言できる。
+
+これにより将来SimRobot → PiRobot / ROS2へ移行しても、Runtime Plugin側の依存境界を明確に保つ。
 
 ## Evaluation Scenario Adapter
 
@@ -86,15 +157,39 @@ Skill評価で使う以下の内容もPlugin側の責務にする。
 - trial metric計測
 - aggregate
 
-`src/evaluation/skill_evaluator.js` は現在、Skill固有の `switch(skillId)` を持たない。
+`src/evaluation/skill_evaluator.js` はSkill固有の `switch(skillId)` を持たない。
 
-現在のフォークリフト用Scenarioは:
+現在のフォークリフト用Scenario:
 
 `src/learning/plugins/forklift_evaluation_scenarios.js`
 
-にある。
-
 将来Camera perceptionや3D manipulationを追加するときは、そのPlugin専用Scenario Adapterへ差し替える。
+
+## Episode reproducibility metadata
+
+Task開始時にLearning Framework状態をSnapshotする。
+
+`src/learning/framework/episode_metadata.js`
+
+Episode metaにはSkillごとに以下を保存する。
+
+- Learning Plugin ID / version
+- selected Policy
+- Runtime Adapter
+- Evaluation Scenario Adapter
+- Model algorithm / version / trainedAt / samples / epochs / loss
+- Training Backend ID / version
+- Dataset source / Adapter ID / version
+
+モデル重みそのものはEpisodeへ複製しない。
+
+各Step resultには実際に使用された:
+
+- `policy`
+- `runtimePlugin`
+- `runtimeAdapter`
+
+を保存する。
 
 ## Current default plugins
 
@@ -107,10 +202,12 @@ Skill評価で使う以下の内容もPlugin側の責務にする。
 - Transport
 - Retreat
 
-現在の具体実装:
+現在:
 
-- Dataset: synthetic expert observation/action
+- Dataset Adapter: Motion observation/action
+- Dataset: synthetic expert / imported manual demo
 - Algorithm: Behavior Cloning
+- Training Backend: Web Worker
 - Runtime Adapter: Motion BC Runtime
 - Evaluation Scenario: Forklift Motion Scenarios
 - Evaluation: success / collision / control steps / final error (+ skill-specific metrics)
@@ -119,7 +216,7 @@ Skill評価で使う以下の内容もPlugin側の責務にする。
   - dataset distribution
   - Classic vs Learned
 
-これは **最初の具体例** であり、framework本体ではない。
+これは **最初の具体例** であり、Framework本体ではない。
 
 ### `perception_future`
 
@@ -127,9 +224,9 @@ Skill評価で使う以下の内容もPlugin側の責務にする。
 
 - DetectPallet
 
-現在はフォークリフトの簡易Scenario Adapterを使うが、将来は以下へ差し替える。
+将来:
 
-- RGB / Depth dataset
+- RGB / Depth dataset adapter
 - Detector / Segmentation / VLM
 - perception runtime adapter
 - camera-specific evaluation scenario
@@ -144,9 +241,9 @@ Skill評価で使う以下の内容もPlugin側の責務にする。
 - Lift
 - Place
 
-現在はフォークリフトの簡易Scenario Adapterを使うが、将来は以下へ差し替える。
+将来:
 
-- trajectory dataset
+- trajectory dataset adapter
 - BC / ACT / Diffusion Policy / RL
 - manipulation runtime adapter
 - physics/contact evaluation scenario
@@ -164,18 +261,16 @@ Plugin Descriptor
   ↓
 UI builds controls dynamically
   ↓
-Plugin train/evaluate
+Dataset Adapter / Training Backend / Plugin train/evaluate
   ↓
 Plugin-defined runtime / scenario / visualizations / metrics
 ```
 
-新しいPluginで必要なTraining ParameterやEvaluation Metricが変わっても、基本的にページ本体を変更しない。
+新しいPluginでTraining ParameterやEvaluation Metricが変わっても、基本的にページ本体を変更しない。
 
 ## Visualization framework
 
 `src/learning/framework/visualization_renderer.js`
-
-可視化タイプごとにRendererを登録する。
 
 現在:
 
@@ -184,14 +279,14 @@ Plugin-defined runtime / scenario / visualizations / metrics
 - `policy_comparison`
 - `capability_note`
 
-将来、Perception Pluginなら以下を追加できる。
+将来、Perception Pluginなら:
 
 - `pr_curve`
 - `confusion_matrix`
 - `detection_gallery`
 - `pose_error_distribution`
 
-Manipulation Pluginなら以下を追加できる。
+Manipulation Pluginなら:
 
 - `trajectory_3d`
 - `action_timeline`
@@ -201,7 +296,7 @@ Manipulation Pluginなら以下を追加できる。
 ## Important principle
 
 > Skill Learning Framework は共通。
-> Dataset / Algorithm / Runtime / Evaluation / Visualization はSkill Pluginごとに異なってよい。
+> Dataset / Algorithm / Training Backend / Runtime / Evaluation / Visualization はSkill Pluginごとに異なってよい。
 
 「全SkillをBehavior Cloningにする」「全SkillでLoss graphを出す」といった設計にはしない。
 
@@ -216,12 +311,18 @@ Manipulation Pluginなら以下を追加できる。
 - [x] Learned Runtime routing from SkillExecutor
 - [x] Evaluation Scenario Adapter
 - [x] Skill evaluatorからscenario preparationを分離
+- [x] Web Worker Training Backend
+- [x] Dataset Adapter interface
+- [x] Manual observation/action JSON import
+- [x] LeRobot conversion用 intermediate JSON export
+- [x] Plugin/Policy/Model/Dataset metadataをEpisodeへ保存
+- [x] Domain Service interface
 
 ## Next framework tasks
 
-- [ ] Web Worker training backendを追加してスマホUIをブロックしない
-- [ ] Dataset Adapterへmanual demonstration / LeRobotDatasetを追加
+- [ ] 実際の手動操作からSkill-specific demonstrationを記録するRecorder
+- [ ] 公式LeRobotDatasetへのconverter / importer
 - [ ] Visualization Rendererのplugin-local registrationを強化
-- [ ] Plugin metadata/version/runtime adapterをEpisodeログへ保存
 - [ ] Plugin単位のimport/export package形式を定義
-- [ ] Simulator固有service (`pathTo` 等) の依存をDomain Service interfaceとして明文化
+- [ ] Worker cancellation / timeout
+- [ ] Model ID / checksumを付与して実験再現性をさらに上げる
