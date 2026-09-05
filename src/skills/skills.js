@@ -1,3 +1,5 @@
+import {routeSkillRuntime} from '../learning/framework/runtime_router.js';
+
 const skillSpecs={
   navigate_to_pallet:{pre:(s,a)=>s.pallets[a.palletId]?'ok':'pallet_not_found',post:()=>true},
   detect_pallet:{pre:(s,a)=>s.pallets[a.palletId]?'ok':'pallet_not_found',post:(s,a,r)=>!r.ok||s.perception.detectedPallets.includes(a.palletId)},
@@ -13,14 +15,31 @@ const skillSpecs={
 
 export class SkillExecutor{
   constructor(store,policy){this.store=store;this.policy=policy}
+
+  runtimeContext(){
+    const policy=this.policy;
+    return{
+      store:this.store,
+      robot:policy.robot,
+      classicPolicy:policy,
+      services:{
+        pathTo:target=>typeof policy.pathTo==='function'?policy.pathTo(target):[target],
+        palletApproachPath:pallet=>typeof policy.palletApproachPath==='function'?policy.palletApproachPath(pallet):[{x:pallet.x-170,y:pallet.y},{x:pallet.x-125,y:pallet.y}]
+      }
+    };
+  }
+
   async execute(step){
     const spec=skillSpecs[step.name];
     if(!spec)return{ok:false,reason:`unknown_skill:${step.name}`};
     const args=step.args||{};
     const pre=spec.pre(this.store.state,args);
     if(pre!=='ok')return{ok:false,reason:`precondition_failed:${pre}`};
-    const result=await this.policy.execute(step.name,args);
+
+    const routed=await routeSkillRuntime(step.name,args,this.runtimeContext());
+    const result=routed.handled?routed.result:await this.policy.execute(step.name,args);
+
     if(result.ok&&!spec.post(this.store.state,args,result))return{ok:false,reason:'postcondition_failed'};
-    return result;
+    return routed.handled?{...result,runtimePlugin:routed.pluginId||null,runtimeAdapter:routed.adapterId||null}:result;
   }
 }
