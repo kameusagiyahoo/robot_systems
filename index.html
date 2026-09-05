@@ -3,21 +3,187 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Forklift Agent Research Platform v1.7</title>
+  <title>Forklift Agent Lab v1.7.1</title>
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-<header class="app-header"><div><h1>Forklift Agent Lab <span>v1.7</span></h1><p>タスク実行 → 結果確認 → 原因調査 → Controller / Learned Skill比較</p></div></header>
-<main class="layout">
-  <section class="card action-card"><div class="section-label">1. 実行する</div><h2>Task</h2><textarea id="taskInput" rows="3">パレットAを出荷エリアへ運んで</textarea><div class="button-row primary-actions"><button id="runBtn" class="primary big">▶ Run</button><button id="stepBtn">Step</button><button id="resetBtn">Reset</button><button id="planBtn" class="secondary">Parse only</button></div><p class="hint">通常は <strong>Run</strong> だけでOKです。Resetで初期状態に戻ります。</p></section>
-  <section class="card status-card"><div class="section-label">2. 結果を見る</div><div class="status-row"><div><div class="status-caption">現在の状態</div><div id="statusBadge" class="status-badge idle">待機中</div></div><button id="copyDebugBtn" class="copy-btn">診断情報をコピー</button></div><div class="status-grid"><div><span>Task</span><strong id="statusTask">未実行</strong></div><div><span>Controller</span><strong id="statusController">Pure Pursuit</strong></div><div><span>Step</span><strong id="statusStep">0</strong></div><div><span>Collision</span><strong id="statusCollision">0</strong></div></div><div id="failureSummary" class="failure-summary hidden"><strong>失敗理由</strong><code id="failureReason">-</code></div><p id="statusGuide" class="status-guide">Taskを入力して Run を押してください。</p></section>
-  <section class="card sim-card"><div class="card-head"><div><div class="section-label">3. 動きを見る</div><h2>Warehouse Simulator</h2><p>点線 = 計画Path、丸 = 追従目標</p></div></div><canvas id="simCanvas" width="900" height="560"></canvas><details class="compact-details"><summary>手動操作</summary><div class="manual-controls"><button data-manual="forward">↑ 前進</button><button data-manual="left">← 左</button><button data-manual="right">右 →</button><button data-manual="back">↓ 後退</button><button data-manual="lift">Fork ↑/↓</button></div></details></section>
-  <section class="card log-card"><div class="card-head inline-head"><div><div class="section-label">4. 原因を見る</div><h2>Agent Log</h2></div><div class="button-row no-margin"><button class="copy-btn" data-copy-target="log">コピー</button><button id="clearLogBtn">Clear</button></div></div><div id="log" class="log"></div><p class="hint">失敗時は一番下の <strong>failed</strong> / <strong>ABORT</strong> を確認してください。</p></section>
-  <section class="card settings-card"><div class="section-label">5. 設定・比較</div>
-    <details open><summary>Learned Align（今回追加）</summary><p>学習モデルがブラウザに保存されていれば <code>align_to_pallet</code> だけBehavior Cloning Policyを使います。未学習なら従来制御へ自動フォールバックします。</p><div class="button-row"><a href="./learn.html"><button class="primary">学習ページを開く</button></a></div></details>
-    <details open><summary>Controller</summary><div class="form-grid"><label>方式<select id="controllerSelect"><option value="pure_pursuit">Pure Pursuit</option><option value="rule_waypoint">Rule Waypoint</option><option value="pid_path">PID Path</option></select></label><label>Lookahead<input id="lookaheadInput" type="number" min="20" max="120" step="5" value="55"></label></div><details class="nested-details"><summary>PID tuning</summary><div class="form-grid pid-grid"><label>Kp <input id="pidKp" type="number" step="0.05" value="0.8"></label><label>Ki <input id="pidKi" type="number" step="0.01" value="0.01"></label><label>Kd <input id="pidKd" type="number" step="0.01" value="0.18"></label><label>CTE gain <input id="pidCte" type="number" step="0.1" value="1.2"></label></div></details></details>
-    <details><summary>Failure Lab（故障をわざと起こす）</summary><div class="toggle-list"><label><input id="obstacleToggle" type="checkbox"> 経路上の障害物</label><label><input id="detectFailToggle" type="checkbox"> パレット検出を強制失敗</label><label><input id="alignFailToggle" type="checkbox"> 位置合わせを強制失敗</label><label><input id="insertFailToggle" type="checkbox"> フォーク差し込みを強制失敗</label></div></details>
-    <details><summary>Benchmark Suite</summary><div class="form-grid"><label>Seed <input id="benchmarkSeed" type="text" value="42"></label><label>Scenarios <input id="benchmarkScenarios" type="number" min="1" max="50" value="8"></label></div><div class="button-row"><button id="batchBtn" class="primary">Run Benchmark</button><button id="benchmarkJsonBtn">JSON保存</button><button id="benchmarkCsvBtn">CSV保存</button><button class="copy-btn" data-copy-target="batchState">結果コピー</button></div><pre id="batchState" class="data-box small">No benchmark result yet.</pre></details>
+<header class="app-header">
+  <div class="header-inner">
+    <div>
+      <h1>Forklift Agent Lab <span>v1.7.1</span></h1>
+      <p>フォークリフトAgentを実行して、成功・失敗を確認するシミュレータ</p>
+    </div>
+    <div class="mode-pill">基本画面</div>
+  </div>
+</header>
+
+<main class="simple-layout">
+  <section class="card quick-card">
+    <div class="eyebrow">まずはここだけ使えばOK</div>
+    <h2>① タスクを入力して実行</h2>
+    <textarea id="taskInput" rows="3">パレットAを出荷エリアへ運んで</textarea>
+    <div class="main-actions">
+      <button id="runBtn" class="primary run-button">▶ 実行する</button>
+      <button id="resetBtn">↺ 最初に戻す</button>
+    </div>
+    <p class="plain-help">通常は「実行する」だけ押してください。</p>
   </section>
-  <section class="card debug-card"><div class="section-label">6. 開発者向け詳細</div><details open><summary>Episode</summary><div class="detail-actions"><button class="copy-btn" data-copy-target="episodeState">コピー</button><button id="downloadEpisodeBtn">JSON保存</button></div><pre id="episodeState" class="data-box"></pre></details><details><summary>Decision History</summary><div id="skillQueue" class="skill-queue"></div></details><details><summary>Agent State</summary><div class="detail-actions"><button class="copy-btn" data-copy-target="agentState">コピー</button></div><pre id="agentState" class="data-box"></pre></details><details><summary>Robot / Vehicle State</summary><div class="detail-actions"><button class="copy-btn" data-copy-target="robotState">コピー</button></div><pre id="robotState" class="data-box"></pre></details></section>
-</main><div id="toast" class="toast" role="status" aria-live="polite"></div><script type="module" src="./app.js"></script></body></html>
+
+  <section class="card result-card">
+    <div class="result-top">
+      <div>
+        <div class="eyebrow">② 結果</div>
+        <div id="statusBadge" class="status-badge idle">待機中</div>
+      </div>
+      <button id="copyDebugBtn" class="copy-btn">診断情報をコピー</button>
+    </div>
+
+    <p id="statusGuide" class="result-message">タスクを入力して「実行する」を押してください。</p>
+
+    <div id="failureSummary" class="failure-summary hidden">
+      <span>失敗理由</span>
+      <code id="failureReason">-</code>
+      <p>失敗したら「診断情報をコピー」を押して、そのままChatGPTに貼ってください。</p>
+    </div>
+
+    <div class="mini-stats">
+      <div><span>Task</span><strong id="statusTask">未実行</strong></div>
+      <div><span>Controller</span><strong id="statusController">Pure Pursuit</strong></div>
+      <div><span>Step</span><strong id="statusStep">0</strong></div>
+      <div><span>Collision</span><strong id="statusCollision">0</strong></div>
+    </div>
+  </section>
+
+  <section class="card sim-card">
+    <div class="section-head">
+      <div>
+        <div class="eyebrow">③ 動きを見る</div>
+        <h2>Warehouse Simulator</h2>
+      </div>
+      <div class="legend-text">点線 = 経路 / 丸 = 追従目標</div>
+    </div>
+    <canvas id="simCanvas" width="900" height="560"></canvas>
+  </section>
+
+  <section class="card learn-card">
+    <div class="eyebrow">必要なときだけ</div>
+    <h2>④ 位置合わせを学習させる</h2>
+    <p>パレット手前の精密な位置合わせだけをBehavior Cloningで学習させます。通常実行と学習は別です。</p>
+    <a class="link-button" href="./learn.html">学習ページを開く →</a>
+  </section>
+
+  <section class="card log-card">
+    <details>
+      <summary>ログを見る（失敗原因を詳しく確認）</summary>
+      <div class="detail-toolbar">
+        <button class="copy-btn" data-copy-target="log">ログをコピー</button>
+        <button id="clearLogBtn">Clear</button>
+      </div>
+      <div id="log" class="log"></div>
+    </details>
+  </section>
+
+  <section class="card advanced-card">
+    <details>
+      <summary>研究者向け設定を開く</summary>
+      <p class="advanced-note">ここは通常操作では触らなくて大丈夫です。Controller比較・故障注入・Benchmark・内部State確認用です。</p>
+
+      <div class="advanced-section">
+        <h3>実行詳細</h3>
+        <div class="button-row">
+          <button id="stepBtn">1 Stepだけ実行</button>
+          <button id="planBtn">Task解析だけ実行</button>
+        </div>
+      </div>
+
+      <div class="advanced-section">
+        <h3>Controller</h3>
+        <div class="form-grid">
+          <label>方式
+            <select id="controllerSelect">
+              <option value="pure_pursuit">Pure Pursuit</option>
+              <option value="rule_waypoint">Rule Waypoint</option>
+              <option value="pid_path">PID Path</option>
+            </select>
+          </label>
+          <label>Lookahead
+            <input id="lookaheadInput" type="number" min="20" max="120" step="5" value="55">
+          </label>
+        </div>
+        <details class="nested-details">
+          <summary>PID tuning</summary>
+          <div class="form-grid">
+            <label>Kp <input id="pidKp" type="number" step="0.05" value="0.8"></label>
+            <label>Ki <input id="pidKi" type="number" step="0.01" value="0.01"></label>
+            <label>Kd <input id="pidKd" type="number" step="0.01" value="0.18"></label>
+            <label>CTE gain <input id="pidCte" type="number" step="0.1" value="1.2"></label>
+          </div>
+        </details>
+      </div>
+
+      <div class="advanced-section">
+        <h3>Failure Lab</h3>
+        <div class="toggle-list">
+          <label><input id="obstacleToggle" type="checkbox"> 経路上の障害物</label>
+          <label><input id="detectFailToggle" type="checkbox"> パレット検出を強制失敗</label>
+          <label><input id="alignFailToggle" type="checkbox"> 位置合わせを強制失敗</label>
+          <label><input id="insertFailToggle" type="checkbox"> フォーク差し込みを強制失敗</label>
+        </div>
+      </div>
+
+      <div class="advanced-section">
+        <h3>Benchmark</h3>
+        <div class="form-grid">
+          <label>Seed <input id="benchmarkSeed" type="text" value="42"></label>
+          <label>Scenarios <input id="benchmarkScenarios" type="number" min="1" max="50" value="8"></label>
+        </div>
+        <div class="button-row">
+          <button id="batchBtn" class="primary">Benchmark実行</button>
+          <button id="benchmarkJsonBtn">JSON保存</button>
+          <button id="benchmarkCsvBtn">CSV保存</button>
+          <button class="copy-btn" data-copy-target="batchState">結果コピー</button>
+        </div>
+        <pre id="batchState" class="data-box small">No benchmark result yet.</pre>
+      </div>
+
+      <div class="advanced-section">
+        <h3>手動操作</h3>
+        <div class="manual-controls">
+          <button data-manual="forward">↑ 前進</button>
+          <button data-manual="left">← 左</button>
+          <button data-manual="right">右 →</button>
+          <button data-manual="back">↓ 後退</button>
+          <button data-manual="lift">Fork ↑/↓</button>
+        </div>
+      </div>
+
+      <div class="advanced-section">
+        <h3>内部データ</h3>
+        <details>
+          <summary>Episode</summary>
+          <div class="detail-toolbar"><button class="copy-btn" data-copy-target="episodeState">コピー</button><button id="downloadEpisodeBtn">JSON保存</button></div>
+          <pre id="episodeState" class="data-box"></pre>
+        </details>
+        <details>
+          <summary>Decision History</summary>
+          <div id="skillQueue" class="skill-queue"></div>
+        </details>
+        <details>
+          <summary>Agent State</summary>
+          <div class="detail-toolbar"><button class="copy-btn" data-copy-target="agentState">コピー</button></div>
+          <pre id="agentState" class="data-box"></pre>
+        </details>
+        <details>
+          <summary>Robot / Vehicle State</summary>
+          <div class="detail-toolbar"><button class="copy-btn" data-copy-target="robotState">コピー</button></div>
+          <pre id="robotState" class="data-box"></pre>
+        </details>
+      </div>
+    </details>
+  </section>
+</main>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script type="module" src="./app.js"></script>
+</body>
+</html>
