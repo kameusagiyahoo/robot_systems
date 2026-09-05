@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>Forklift Agent Lab</title>
+  <title>Forklift Agent Lab v1.9</title>
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
 <header class="mobile-header">
-  <div><strong>Forklift Agent Lab</strong><span>Skill Learning</span></div>
+  <div><strong>Forklift Agent Lab</strong><span>Skill Learning / Evaluation v1.9</span></div>
   <div id="statusBadge" class="status-badge idle">待機中</div>
 </header>
 
@@ -30,7 +30,7 @@
   <section class="pipeline-panel">
     <div class="pipeline-head">
       <div><strong>Task Pipeline</strong><span id="pipelineTaskName">パレット搬送</span></div>
-      <span id="pipelineLearnedSummary" class="learned-summary">学習状態</span>
+      <span id="pipelineLearnedSummary" class="learned-summary">学習 / 評価</span>
     </div>
     <div id="taskPipeline" class="task-pipeline"></div>
   </section>
@@ -41,7 +41,7 @@
 </main>
 
 <nav class="bottom-nav" aria-label="補助メニュー">
-  <button data-open-sheet="learnSheet"><span>学習</span><small>Skill別</small></button>
+  <button data-open-sheet="learnSheet"><span>Skill</span><small>学習・評価</small></button>
   <button data-open-sheet="logSheet"><span>ログ</span><small>原因</small></button>
   <button data-open-sheet="settingsSheet"><span>研究設定</span><small>比較</small></button>
 </nav>
@@ -51,9 +51,9 @@
 </div>
 
 <dialog id="learnSheet" class="bottom-sheet">
-  <div class="sheet-head"><div><small>Taskを構成するSkillごとに管理</small><h2>Skill Learning</h2></div><button data-close-sheet>×</button></div>
+  <div class="sheet-head"><div><small>Taskを構成するSkillごとに管理</small><h2>Skill Learning / Evaluation</h2></div><button data-close-sheet>×</button></div>
   <div class="sheet-body">
-    <p class="sheet-note">各SkillのPolicy / Dataset / Model / Training状態を個別に管理します。</p>
+    <p class="sheet-note">各Skillごとに学習状態と単体評価結果を確認できます。「評価」でそのSkillだけを複数条件でテストします。</p>
     <div id="learningSkillList" class="learning-skill-list"></div>
   </div>
 </dialog>
