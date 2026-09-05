@@ -18,7 +18,7 @@
 - Classic vs Learned comparison
 - seeded benchmark / evaluation history
 - Episode logging and JSON/CSV export
-- plugin-based **Skill Learning Framework**
+- plugin-based **Skill Learning Framework v2.2**
 
 ## Architecture
 
@@ -29,7 +29,9 @@ Planner
    ↓
 Skill
    ↓
-Policy / Controller
+SkillExecutor
+   ├ Classic Policy
+   └ Learning Runtime Router → Plugin Runtime Adapter
    ↓
 RobotInterface
    ↓
@@ -48,18 +50,19 @@ Observation / Result
 
 ```text
 Skill
-├ Runtime Policy
+├ Runtime Policy Adapter
 ├ Dataset Adapter
 ├ Training Plugin
-├ Evaluation Adapter
+├ Evaluation Scenario Adapter
+├ Evaluation Metrics
 └ Visualization Adapter
 ```
 
-SkillごとにDataset、Algorithm、評価指標、可視化を差し替えます。
+SkillごとにDataset、Algorithm、Runtime、評価Scenario、評価指標、可視化を差し替えます。
 
 現在の例:
 
-- Motion Skills → Behavior Cloning plugin
+- Motion Skills → Behavior Cloning plugin + Motion BC Runtime
 - DetectPallet → future Perception plugin
 - Insert/Lift/Place → future Manipulation plugin
 
@@ -71,15 +74,51 @@ SkillごとにDataset、Algorithm、評価指標、可視化を差し替えま�
 src/learning/framework/
   skill_learning_plugin.js
   plugin_registry.js
+  runtime_policy_adapter.js
+  runtime_router.js
+  evaluation_scenario_adapter.js
   visualization_renderer.js
 
 src/learning/plugins/
   default_skill_plugins.js
+  motion_bc_runtime.js
+  forklift_evaluation_scenarios.js
 
 src/learning/ui/
   learning_page.js
   evaluation_page.js
 ```
+
+### Runtime route
+
+```text
+SkillExecutor
+  ↓
+selected policy?
+  ├ Classic → RulePolicy / controller
+  └ Learned → Runtime Router → Skill Plugin Runtime Adapter
+```
+
+`RulePolicy` はClassic制御だけを担当し、BC/ACT/SAC等の学習方式固有Runtimeを直接持たない方針です。
+
+### Evaluation route
+
+```text
+Skill Evaluation UI
+  ↓
+Learning Plugin
+  ↓
+Skill Evaluator
+  ↓
+Evaluation Scenario Adapter
+  ├ create runtime
+  ├ prepare trial
+  ├ execute skill
+  ├ measure trial
+  └ aggregate metrics
+```
+
+`skill_evaluator.js` はSkill固有の初期条件生成を持たず、Scenario Adapterへ委譲します。
 
 ## Research migration path
 
