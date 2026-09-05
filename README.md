@@ -2,7 +2,7 @@
 
 物流フォークリフトを題材に、**Task → Planner → Skill → Policy → Robot → Environment** の階層構造を段階的に研究するための実験基盤です。
 
-現在は GitHub Pages 上で、連続運動シミュレーション、Skill単位の学習・評価、Classic/Learned Policy比較、手動Demonstration記録まで動作する静的研究基盤です。OpenAI APIなどの秘密情報はまだブラウザ側では使いません。
+現在は GitHub Pages 上で、連続運動シミュレーション、Skill単位の学習・評価、Classic/Learned Policy比較、手動Demonstration記録、学習Modelの再現性管理まで動作する静的研究基盤です。OpenAI APIなどの秘密情報はまだブラウザ側では使いません。
 
 ## Current features
 
@@ -18,11 +18,13 @@
 - Classic vs Learned comparison
 - seeded benchmark / evaluation history
 - Episode logging and JSON/CSV export
-- plugin-based **Skill Learning Framework v2.4**
-- Web Worker training backend for motion BC
+- plugin-based **Skill Learning Framework v2.5**
+- cancellable Web Worker training + timeout
 - Dataset Adapter with synthetic/manual workflows
 - Skill-specific Demonstration Recorder Adapter
 - long-press manual driving → observation/action dataset
+- deterministic Model ID + checksum
+- Skill Learning Package import/export + integrity check
 - LeRobot conversion用 intermediate JSON export
 - Plugin/Policy/Model/Dataset/Recorder metadata in Episode logs
 - named Domain Service contracts for learned runtimes
@@ -91,6 +93,8 @@ src/learning/framework/
   visualization_renderer.js
   episode_metadata.js
   domain_service_interface.js
+  model_identity.js
+  skill_package.js
 
 src/learning/algorithms/
   motion_bc_core.js
@@ -144,10 +148,10 @@ Training Backend
   ↓
 Web Worker
   ↓
-Model
+Model ID + checksum
 ```
 
-Motion BCはWeb Workerで学習します。Workerが利用できない場合のみmain thread fallbackします。
+Motion BCはWeb Workerで学習します。学習中はキャンセル可能で、Pluginが公開したtimeoutを超えるとWorkerを停止します。cancel / timeout時にはmain-thread fallbackしません。
 
 ### Runtime route
 
@@ -188,6 +192,22 @@ Evaluation Scenario Adapter
 ```
 
 `skill_evaluator.js` はSkill固有の初期条件生成を持たず、Scenario Adapterへ委譲します。
+
+### Skill Learning Package
+
+学習画面から1 Skillの研究状態をJSON PackageとしてExport / Importできます。
+
+Packageには以下を含みます。
+
+- Plugin ID / version
+- selected Policy
+- Model + Model checksum
+- Dataset metadata
+- manual/recorded Dataset payload（該当時）
+- Evaluation history
+- Package checksum
+
+Import時にPackage checksumとModel checksumを検証します。
 
 ### Dataset interchange
 
