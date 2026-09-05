@@ -4,16 +4,16 @@ import {getLearningDescriptor} from './plugin_registry.js';
 
 function modelMeta(model){
   if(!model)return null;
-  return{version:model.version??null,algorithm:model.algorithm||null,trainedAt:model.trainedAt||null,samples:model.samples??null,epochs:model.epochs??null,loss:Number.isFinite(Number(model.loss))?Number(model.loss):null,pluginId:model.pluginId||null,trainingBackendId:model.trainingBackendId||null,trainingBackendVersion:model.trainingBackendVersion??null,datasetSource:model.datasetSource||null};
+  return{modelId:model.modelId||null,checksum:model.checksum||null,identityAlgorithm:model.identityAlgorithm||null,version:model.version??null,algorithm:model.algorithm||null,trainedAt:model.trainedAt||null,samples:model.samples??null,epochs:model.epochs??null,loss:Number.isFinite(Number(model.loss))?Number(model.loss):null,pluginId:model.pluginId||null,pluginVersion:model.pluginVersion??null,trainingBackendId:model.trainingBackendId||null,trainingBackendVersion:model.trainingBackendVersion??null,datasetSource:model.datasetSource||null,packageChecksum:model.packageChecksum||null};
 }
 function datasetMeta(dataset){
   if(!dataset)return null;
-  return{kind:dataset.kind||null,samples:dataset.samples??null,seed:dataset.seed??null,generatedAt:dataset.generatedAt||null,recordedAt:dataset.recordedAt||null,datasetAdapterId:dataset.datasetAdapterId||null,datasetAdapterVersion:dataset.datasetAdapterVersion??null,demonstrationRecorderAdapterId:dataset.demonstrationRecorderAdapterId||null,demonstrationRecorderAdapterVersion:dataset.demonstrationRecorderAdapterVersion??null};
+  return{kind:dataset.kind||null,samples:dataset.samples??null,seed:dataset.seed??null,generatedAt:dataset.generatedAt||null,recordedAt:dataset.recordedAt||null,datasetAdapterId:dataset.datasetAdapterId||null,datasetAdapterVersion:dataset.datasetAdapterVersion??null,demonstrationRecorderAdapterId:dataset.demonstrationRecorderAdapterId||null,demonstrationRecorderAdapterVersion:dataset.demonstrationRecorderAdapterVersion??null,packageChecksum:dataset.packageChecksum||null};
 }
 
 export function buildLearningEpisodeMetadata(){
   return{
-    frameworkVersion:2,
+    frameworkVersion:3,
     capturedAt:new Date().toISOString(),
     skills:SKILL_LEARNING_REGISTRY.map(skill=>{
       const descriptor=getLearningDescriptor(skill.id),model=loadSkillModel(skill.id),dataset=loadDatasetMeta(skill.id);
