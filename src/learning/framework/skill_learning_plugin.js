@@ -7,6 +7,8 @@ export class SkillLearningPlugin{
   getCapabilities(){return{trainable:false,evaluable:true,runtimeLearning:false,policies:['classic']}}
   getAlgorithms(){return[]}
   getDatasetSchema(){return null}
+  getTrainingParameters(){return[]}
+  getEvaluationParameters(){return[]}
   getEvaluationMetrics(){return[{key:'successRate',label:'成功率',format:'percent'}]}
   getVisualizations(){return[]}
   getNote(){return''}
@@ -23,6 +25,8 @@ export class SkillLearningPlugin{
       capabilities:this.getCapabilities(skillId),
       algorithms:this.getAlgorithms(skillId),
       datasetSchema:this.getDatasetSchema(skillId),
+      trainingParameters:this.getTrainingParameters(skillId),
+      evaluationParameters:this.getEvaluationParameters(skillId),
       evaluationMetrics:this.getEvaluationMetrics(skillId),
       visualizations:this.getVisualizations(skillId),
       note:this.getNote(skillId)
@@ -37,6 +41,8 @@ export class DescriptorOnlyLearningPlugin extends SkillLearningPlugin{
   getCapabilities(skillId){return this.value('capabilities',skillId,super.getCapabilities(skillId))}
   getAlgorithms(skillId){return this.value('algorithms',skillId,[])}
   getDatasetSchema(skillId){return this.value('datasetSchema',skillId,null)}
+  getTrainingParameters(skillId){return this.value('trainingParameters',skillId,[])}
+  getEvaluationParameters(skillId){return this.value('evaluationParameters',skillId,[])}
   getEvaluationMetrics(skillId){return this.value('evaluationMetrics',skillId,super.getEvaluationMetrics(skillId))}
   getVisualizations(skillId){return this.value('visualizations',skillId,[])}
   getNote(skillId){return this.value('note',skillId,'')}
