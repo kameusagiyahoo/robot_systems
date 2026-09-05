@@ -17,8 +17,8 @@ export function densifyPath(start,waypoints,spacing=18){
   return pts;
 }
 
-export function purePursuitCommand(robot,path,{lookahead=55,wheelbase=52,maxSteeringAngle=35,maxSpeed=90,minSpeed=24}={}){
-  if(!path.length)return{done:true,index:0,target:null,speed:0,steeringAngle:0,crossTrackError:0};
+export function purePursuitCommand(robot,path,{lookahead=55,wheelbase=52,maxSteeringAngle=35,maxSpeed=90,minSpeed=8,goalTolerance=12}={}){
+  if(!path.length)return{done:true,index:0,target:null,speed:0,steeringAngle:0,crossTrackError:0,goalDistance:0};
   let nearest=0,nearestDist=Infinity;
   for(let i=0;i<path.length;i++){
     const d=Math.hypot(path[i].x-robot.x,path[i].y-robot.y);
@@ -34,13 +34,14 @@ export function purePursuitCommand(robot,path,{lookahead=55,wheelbase=52,maxStee
   const target=path[targetIndex];
   const goal=path[path.length-1];
   const goalDist=Math.hypot(goal.x-robot.x,goal.y-robot.y);
-  if(goalDist<10)return{done:true,index:targetIndex,target:goal,speed:0,steeringAngle:0,crossTrackError:nearestDist};
+  if(goalDist<=goalTolerance)return{done:true,index:targetIndex,target:goal,speed:0,steeringAngle:0,crossTrackError:nearestDist,goalDistance:goalDist};
   const desired=Math.atan2(target.y-robot.y,target.x-robot.x)*180/Math.PI;
   const alpha=angleWrap(desired-robot.yaw)*Math.PI/180;
   const delta=rad2deg(Math.atan2(2*wheelbase*Math.sin(alpha),Math.max(lookahead,1)));
-  const steeringAngle=clamp(-delta,-maxSteeringAngle,maxSteeringAngle); // rear steer
-  const curvaturePenalty=Math.max(0.28,1-Math.abs(steeringAngle)/maxSteeringAngle*0.72);
-  const goalPenalty=Math.max(0.3,Math.min(1,goalDist/90));
-  const speed=Math.max(minSpeed,maxSpeed*curvaturePenalty*goalPenalty);
-  return{done:false,index:targetIndex,target,speed,steeringAngle,crossTrackError:nearestDist};
+  const steeringAngle=clamp(-delta,-maxSteeringAngle,maxSteeringAngle);
+  const curvaturePenalty=Math.max(0.25,1-Math.abs(steeringAngle)/maxSteeringAngle*0.75);
+  // Slow continuously near the goal instead of enforcing a high minimum speed.
+  const approachSpeed=clamp(goalDist*1.15,minSpeed,maxSpeed);
+  const speed=Math.min(approachSpeed,maxSpeed*curvaturePenalty);
+  return{done:false,index:targetIndex,target,speed,steeringAngle,crossTrackError:nearestDist,goalDistance:goalDist};
 }
