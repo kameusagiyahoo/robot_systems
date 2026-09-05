@@ -3,24 +3,24 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Forklift Agent Lab v1.7.1</title>
+  <title>Forklift Agent Lab v1.7.2</title>
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
 <header class="app-header">
   <div class="header-inner">
     <div>
-      <h1>Forklift Agent Lab <span>v1.7.1</span></h1>
-      <p>フォークリフトAgentを実行して、成功・失敗を確認するシミュレータ</p>
+      <h1>Forklift Agent Lab <span>v1.7.2</span></h1>
+      <p>TaskをSkillに分解し、各Skillの方式・学習状態・実行結果を確認する研究基盤</p>
     </div>
-    <div class="mode-pill">基本画面</div>
+    <div class="mode-pill">Task / Skill view</div>
   </div>
 </header>
 
 <main class="simple-layout">
   <section class="card quick-card">
-    <div class="eyebrow">まずはここだけ使えばOK</div>
-    <h2>① タスクを入力して実行</h2>
+    <div class="eyebrow">STEP 1</div>
+    <h2>タスクを入力して実行</h2>
     <textarea id="taskInput" rows="3">パレットAを出荷エリアへ運んで</textarea>
     <div class="main-actions">
       <button id="runBtn" class="primary run-button">▶ 実行する</button>
@@ -32,20 +32,17 @@
   <section class="card result-card">
     <div class="result-top">
       <div>
-        <div class="eyebrow">② 結果</div>
+        <div class="eyebrow">実行結果</div>
         <div id="statusBadge" class="status-badge idle">待機中</div>
       </div>
       <button id="copyDebugBtn" class="copy-btn">診断情報をコピー</button>
     </div>
-
     <p id="statusGuide" class="result-message">タスクを入力して「実行する」を押してください。</p>
-
     <div id="failureSummary" class="failure-summary hidden">
       <span>失敗理由</span>
       <code id="failureReason">-</code>
       <p>失敗したら「診断情報をコピー」を押して、そのままChatGPTに貼ってください。</p>
     </div>
-
     <div class="mini-stats">
       <div><span>Task</span><strong id="statusTask">未実行</strong></div>
       <div><span>Controller</span><strong id="statusController">Pure Pursuit</strong></div>
@@ -54,22 +51,39 @@
     </div>
   </section>
 
+  <section class="card pipeline-card">
+    <div class="section-head">
+      <div>
+        <div class="eyebrow">STEP 2</div>
+        <h2>Task Pipeline</h2>
+        <p class="pipeline-intro">このTaskが、どのSkillに分解され、各Skillが何の方式で動いているかを表示します。</p>
+      </div>
+      <div class="pipeline-summary">
+        <span id="pipelineLearnedSummary">学習型Skill: 0 / 8</span>
+      </div>
+    </div>
+    <div class="pipeline-task-box">
+      <span>現在のTask</span>
+      <strong id="pipelineTaskName">パレット搬送タスク</strong>
+    </div>
+    <div id="taskPipeline" class="task-pipeline"></div>
+    <div class="pipeline-legend">
+      <span><i class="legend-dot pending"></i>未実行</span>
+      <span><i class="legend-dot current"></i>実行中</span>
+      <span><i class="legend-dot success"></i>成功</span>
+      <span><i class="legend-dot failed"></i>失敗</span>
+    </div>
+  </section>
+
   <section class="card sim-card">
     <div class="section-head">
       <div>
-        <div class="eyebrow">③ 動きを見る</div>
+        <div class="eyebrow">STEP 3</div>
         <h2>Warehouse Simulator</h2>
       </div>
       <div class="legend-text">点線 = 経路 / 丸 = 追従目標</div>
     </div>
     <canvas id="simCanvas" width="900" height="560"></canvas>
-  </section>
-
-  <section class="card learn-card">
-    <div class="eyebrow">必要なときだけ</div>
-    <h2>④ 位置合わせを学習させる</h2>
-    <p>パレット手前の精密な位置合わせだけをBehavior Cloningで学習させます。通常実行と学習は別です。</p>
-    <a class="link-button" href="./learn.html">学習ページを開く →</a>
   </section>
 
   <section class="card log-card">
@@ -185,5 +199,6 @@
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <script type="module" src="./app.js"></script>
+<script type="module" src="./pipeline.js"></script>
 </body>
 </html>
