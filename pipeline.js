@@ -1,4 +1,6 @@
+import './src/learning/plugins/default_skill_plugins.js';
 import {SKILL_LEARNING_REGISTRY,skillLearningState,learningSummary,latestEvaluationForPolicy} from './src/learning/skill_learning_registry.js';
+import {getLearningDescriptor} from './src/learning/framework/plugin_registry.js';
 
 const $=s=>document.querySelector(s);
 function controllerLabel(){const v=$('#controllerSelect')?.value||'pure_pursuit';return{pure_pursuit:'PurePursuit',rule_waypoint:'Rule',pid_path:'PID'}[v]||v}
@@ -15,8 +17,8 @@ function methodFor(skill){
   return `${method} · ${score}`;
 }
 function learningLabel(skill){
-  const s=skillLearningState(skill.id);
-  if(!skill.trainable)return skill.group==='perception'?'画像待ち':'固定';
+  const s=skillLearningState(skill.id),cap=getLearningDescriptor(skill.id).capabilities;
+  if(!cap.trainable)return skill.group==='perception'?'画像待ち':'固定';
   if(s.trained)return s.policy==='learned'?'学習ON':'学習済';
   return'未学習';
 }
@@ -35,14 +37,14 @@ function renderPipeline(){
   const host=$('#taskPipeline');if(!host)return;
   const states=parseStatuses();host.innerHTML='';
   SKILL_LEARNING_REGISTRY.forEach(skill=>{
-    const state=states[skill.id],learn=skillLearningState(skill.id),card=document.createElement('div');
+    const state=states[skill.id],learn=skillLearningState(skill.id),cap=getLearningDescriptor(skill.id).capabilities,card=document.createElement('div');
     card.className=`pipeline-skill ${state}`;card.dataset.skill=skill.id;card.title=`${skill.order}. ${skill.code} / ${skill.desc} / 評価 ${evalLabel(skill)}`;
-    const action=`<a class="skill-learn-link${skill.trainable?'':' muted'}" href="./learn.html?skill=${encodeURIComponent(skill.id)}">${learn.trained?'管理':'詳細'}</a>`;
+    const action=`<a class="skill-learn-link${cap.trainable?'':' muted'}" href="./learn.html?skill=${encodeURIComponent(skill.id)}">${learn.trained?'管理':'詳細'}</a>`;
     card.innerHTML=`<div class="skill-order">${skill.order}</div><div class="skill-main"><strong>${skill.order}. ${skill.label}</strong><span class="skill-desc">${skill.desc}</span><div class="skill-meta"><span>${methodFor(skill)}</span><span>${learningLabel(skill)}</span></div></div><div class="skill-side"><span class="pipeline-status ${state}">${statusText(state)}</span>${action}</div>`;
     host.appendChild(card);
   });
   const task=$('#taskInput')?.value?.trim();if($('#pipelineTaskName'))$('#pipelineTaskName').textContent=task||'パレット搬送';
-  const all=learningSummary(),trainable=all.filter(x=>x.trainable).length,trained=all.filter(x=>x.trained).length,evaluated=all.filter(x=>x.evaluationHistory?.length||x.evaluation).length;
+  const all=learningSummary(),trainable=SKILL_LEARNING_REGISTRY.filter(s=>getLearningDescriptor(s.id).capabilities.trainable).length,trained=all.filter(x=>x.trained).length,evaluated=all.filter(x=>x.evaluationHistory?.length||x.evaluation).length;
   if($('#pipelineLearnedSummary'))$('#pipelineLearnedSummary').textContent=`学習 ${trained}/${trainable}・評価 ${evaluated}/${all.length}`;
   window.dispatchEvent(new CustomEvent('pipeline:model',{detail:{summary:all}}));
 }
