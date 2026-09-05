@@ -21,8 +21,9 @@ export class BehaviorCloningAlign{
     const x=features(obs),speedN=Math.tanh(dot(this.model.speedW,x)),steerN=Math.tanh(dot(this.model.steerW,x));
     return{speed:clamp(speedN*32,-32,32),steeringAngle:clamp(steerN*35,-35,35)};
   }
-  train(samples,{epochs=900,lr=0.025}={}){
-    const speedW=Array(7).fill(0),steerW=Array(7).fill(0);let loss=0;
+  train(samples,{epochs=900,lr=0.025,onEpoch=null}={}){
+    const speedW=Array(7).fill(0),steerW=Array(7).fill(0),lossHistory=[];let loss=0,rate=lr;
+    const every=Math.max(1,Math.floor(epochs/60));
     for(let e=0;e<epochs;e++){
       loss=0;
       for(const s of samples){
@@ -30,13 +31,15 @@ export class BehaviorCloningAlign{
         const ps=Math.tanh(dot(speedW,x)),pt=Math.tanh(dot(steerW,x));
         const es=ps-ys,et=pt-yt;loss+=es*es+et*et;
         for(let j=0;j<x.length;j++){
-          speedW[j]-=lr*es*(1-ps*ps)*x[j];
-          steerW[j]-=lr*et*(1-pt*pt)*x[j];
+          speedW[j]-=rate*es*(1-ps*ps)*x[j];
+          steerW[j]-=rate*et*(1-pt*pt)*x[j];
         }
       }
-      lr*=0.998;
+      const avgLoss=loss/Math.max(samples.length,1);
+      if(e===0||e===epochs-1||e%every===0){const point={epoch:e+1,loss:avgLoss};lossHistory.push(point);if(onEpoch)onEpoch(point,{epoch:e+1,epochs})}
+      rate*=0.998;
     }
-    const model={version:1,trainedAt:new Date().toISOString(),samples:samples.length,loss:loss/Math.max(samples.length,1),speedW,steerW};
+    const model={version:2,algorithm:'behavior_cloning',trainedAt:new Date().toISOString(),samples:samples.length,epochs,loss:loss/Math.max(samples.length,1),lossHistory,speedW,steerW};
     return this.save(model);
   }
 }
