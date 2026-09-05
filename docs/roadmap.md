@@ -62,7 +62,7 @@
 - [x] Skill → Policy → Robot separation
 - [x] Skill preconditions / postconditions
 - [x] Continuous kinematic RulePolicy instead of teleport placeholders
-- [ ] PID Policy baseline
+- [x] PID Policy baseline
 - [ ] MPC Policy baseline
 
 ### v0.9 — Episode logging / research data
@@ -143,11 +143,14 @@
 - [ ] final-position error metric
 
 ### v1.6 — PID baseline / migration gate
-- [ ] PID steering controller
-- [ ] controller selector: Rule / Pure Pursuit / PID
-- [ ] seeded benchmark comparison across all three
-- [ ] tune PID gains from UI
-- [ ] document migration-ready interfaces
+- [x] PID path steering controller
+- [x] heading error + cross-track error feedback
+- [x] controller selector: Rule / Pure Pursuit / PID
+- [x] seeded benchmark comparison across all three
+- [x] tune Kp / Ki / Kd / CTE gain from UI
+- [x] PID parameters recorded in benchmark / episode metadata
+- [x] migration-ready interfaces documented in `docs/migration_gate.md`
+- [x] Cloudflare/OpenAI migration gate reached
 
 ## Phase 1 — Cloudflare + OpenAI Planner
 - [ ] Move deployment from GitHub Pages to Cloudflare Pages
@@ -161,6 +164,7 @@
 - [ ] Guardrails: allow only declared Skills
 - [ ] LLM chooses next Skill from current observation
 - [ ] Feed result back to Planner and replan until success / abort
+- [ ] Compare RulePlanner vs OpenAIPlanner on seeded benchmark scenarios
 
 ## Phase 2 — Perception and control
 - [ ] Add camera observation to simulator
@@ -169,7 +173,7 @@
 - [ ] pallet hole / fork insertion target estimation
 - [ ] depth / 3D pose representation
 - [ ] visual servo baseline
-- [ ] PID baseline
+- [x] PID baseline
 - [ ] MPC baseline
 - [ ] compare explicit perception+control with learned Skill
 
