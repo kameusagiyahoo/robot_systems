@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Forklift Agent Research Platform v0.6</title>
+  <title>Forklift Agent Research Platform v0.9</title>
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
   <header>
-    <h1>Forklift Agent Research Platform <span>v0.6</span></h1>
-    <p>Task → Observe → Planner → Skill → Result → State を1ステップずつ確認する研究基盤</p>
+    <h1>Forklift Agent Research Platform <span>v0.9</span></h1>
+    <p>Task → Observe → Planner → Skill → Policy → Robot → Result → Replan を追跡する研究基盤</p>
   </header>
   <main class="layout">
     <section class="card sim-card">
@@ -18,12 +18,13 @@
       <div class="manual-controls"><strong>Manual:</strong><button data-manual="forward">↑</button><button data-manual="left">←</button><button data-manual="right">→</button><button data-manual="back">↓</button><button data-manual="lift">Fork ↑/↓</button></div>
     </section>
     <aside class="side">
-      <section class="card"><h2>Task</h2><textarea id="taskInput" rows="4">パレットAを出荷エリアへ運んで</textarea><div class="button-row"><button id="planBtn" class="primary">Parse Task</button><button id="stepBtn">Step</button><button id="runBtn">Run</button><button id="resetBtn">Reset</button></div><p class="hint">Rule PlannerがStateを見て次の1 Skillを選択。将来OpenAI Plannerへ差し替える。</p></section>
-      <section class="card"><h2>Failure Lab</h2><label><input id="obstacleToggle" type="checkbox"> 経路上の障害物</label><br><label><input id="detectFailToggle" type="checkbox"> パレット検出を強制失敗</label><br><label><input id="alignFailToggle" type="checkbox"> 位置合わせを強制失敗</label><br><label><input id="insertFailToggle" type="checkbox"> フォーク差し込みを強制失敗</label><p class="hint">失敗理由をAgentへ返す。v0.7で再計画に利用する。</p></section>
+      <section class="card"><h2>Task</h2><textarea id="taskInput" rows="4">パレットAを出荷エリアへ運んで</textarea><div class="button-row"><button id="planBtn" class="primary">Parse Task</button><button id="stepBtn">Step</button><button id="runBtn">Run</button><button id="resetBtn">Reset</button></div><p class="hint">Rule Plannerが現在Stateと直前Resultを見て、次の1 SkillまたはRecoveryを選択。</p></section>
+      <section class="card"><h2>Failure Lab</h2><label><input id="obstacleToggle" type="checkbox"> 経路上の障害物</label><br><label><input id="detectFailToggle" type="checkbox"> パレット検出を強制失敗</label><br><label><input id="alignFailToggle" type="checkbox"> 位置合わせを強制失敗</label><br><label><input id="insertFailToggle" type="checkbox"> フォーク差し込みを強制失敗</label><p class="hint">失敗理由をPlannerへ返し、retry / recovery / abortを確認。</p></section>
+      <section class="card"><div class="card-head"><h2>Episode</h2><button id="downloadEpisodeBtn">JSON保存</button></div><pre id="episodeState"></pre><p class="hint">Observation / Action / Result / Next Observation を記録。</p></section>
       <section class="card"><h2>Agent State</h2><pre id="agentState"></pre></section>
       <section class="card"><h2>Robot State</h2><pre id="robotState"></pre></section>
     </aside>
-    <section class="card log-card"><div class="card-head"><div><h2>Agent Log</h2><p>Observe → Planner → Skill → Result → State を追跡</p></div><button id="clearLogBtn">Clear</button></div><div id="log" class="log"></div></section>
+    <section class="card log-card"><div class="card-head"><div><h2>Agent Log</h2><p>Observe → Planner → Skill → Policy → Result → Replan を追跡</p></div><button id="clearLogBtn">Clear</button></div><div id="log" class="log"></div></section>
     <section class="card skill-card"><h2>Decision History</h2><div id="skillQueue" class="skill-queue"></div></section>
   </main>
   <script type="module" src="./app.js"></script>
