@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>Forklift Agent Lab v2.5</title>
+  <title>Forklift Agent Lab v2.6</title>
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
 <header class="mobile-header">
-  <div><strong>Forklift Agent Lab</strong><span>Skill Learning Framework v2.5</span></div>
+  <div><strong>Forklift Agent Lab</strong><span>Skill Learning Framework v2.6</span></div>
   <div id="statusBadge" class="status-badge idle">待機中</div>
 </header>
 
@@ -71,7 +71,7 @@
   <div class="sheet-body settings-scroll">
     <details open>
       <summary>Demonstration Recorder / 手動操作</summary>
-      <p class="sheet-note">記録対象Skillを選び、「記録開始」後に方向ボタンを長押しします。Observation + ActionがそのSkillのDataset Adapterへ保存されます。</p>
+      <p class="sheet-note">記録対象Skillを選び、「記録開始」後に方向ボタンを長押しします。1回の開始〜停止を1 Episodeとして保存し、Outcome / Quality / NoteはSkill学習画面で編集できます。</p>
       <div class="form-grid">
         <label>記録するSkill<select id="demoSkill"></select></label>
         <label class="demo-replace-label"><span>Dataset</span><span><input id="demoReplaceToggle" type="checkbox"> 既存デモを置換</span></label>
