@@ -5,7 +5,8 @@ import {BehaviorCloningAlign,generateSyntheticDemos} from '../behavior_cloning_a
 import {saveDatasetMeta,saveSkillModel} from '../skill_learning_registry.js';
 
 const MOTION_SKILLS=['navigate_to_pallet','align_to_pallet','navigate_to','retreat'];
-const metric=(key,label,format='number',unit='')=>({key,label,format,unit});
+const metric=(key,label,format='number',unit='',extra={})=>({key,label,format,unit,...extra});
+const successMetric=()=>metric('successRate','成功率','percent','',{primary:true,better:'higher',goodThreshold:.8});
 
 function datasetSummary(samples){
   const keys=['dx','dy','yawError','speed','steeringAngle'],features={};
@@ -35,15 +36,15 @@ class MotionBehaviorCloningPlugin extends SkillLearningPlugin{
     {key:'controller',label:'Classic Controller',type:'select',default:'pure_pursuit',options:[['pure_pursuit','Pure Pursuit'],['rule_waypoint','Rule Waypoint'],['pid_path','PID Path']]}
   ]}
   getEvaluationMetrics(skillId){
-    const common=[metric('successRate','成功率','percent'),metric('collisionRate','衝突率','percent'),metric('avgControlTicks','平均制御Step','integer'),metric('avgFinalError','最終位置誤差','number','px')];
-    if(skillId==='align_to_pallet')common.push(metric('avgYawError','姿勢誤差','number','°'));
-    if(skillId==='navigate_to_pallet'||skillId==='navigate_to')common.push(metric('avgPathLength','平均走行距離','number','px'));
+    const common=[successMetric(),metric('collisionRate','衝突率','percent','',{better:'lower'}),metric('avgControlTicks','平均制御Step','integer','',{better:'lower'}),metric('avgFinalError','最終位置誤差','number','px',{better:'lower'})];
+    if(skillId==='align_to_pallet')common.push(metric('avgYawError','姿勢誤差','number','°',{better:'lower'}));
+    if(skillId==='navigate_to_pallet'||skillId==='navigate_to')common.push(metric('avgPathLength','平均走行距離','number','px',{better:'lower'}));
     return common;
   }
   getVisualizations(){return[
     {id:'training_loss',type:'loss_curve',title:'学習Loss',source:'model.lossHistory'},
     {id:'dataset_distribution',type:'dataset_distribution',title:'学習データ分布',source:'dataset.featureSummary'},
-    {id:'policy_comparison',type:'policy_comparison',title:'Classic vs Learned',source:'evaluationHistory'}
+    {id:'policy_comparison',type:'policy_comparison',title:'Classic vs Learned',source:'evaluationHistory',metric:'successRate',format:'percent',better:'higher'}
   ]}
   getNote(skillId){return`${skillId} 用の連続制御学習Plugin。Dataset / Training / Evaluation / VisualizationはPlugin側で定義します。`}
   async train(skillId,{samples=2500,seed=42,onProgress=null}={}){
@@ -58,7 +59,7 @@ class MotionBehaviorCloningPlugin extends SkillLearningPlugin{
     const onEpoch=(point,meta)=>onProgress?.({phase:'training',label:'Behavior Cloning 学習中',progress:point.epoch/meta.epochs,point});
     if(skillId==='align_to_pallet'){
       const bc=new BehaviorCloningAlign();model=bc.train(demos,{onEpoch});model=saveSkillModel(skillId,{...model,algorithm:'behavior_cloning',pluginId:this.id});
-    }else{const bc=new BehaviorCloningSkill(skillId);model=bc.train(demos,{onEpoch})}
+    }else{const bc=new BehaviorCloningSkill(skillId);model=bc.train(demos,{onEpoch});model=saveSkillModel(skillId,{...model,pluginId:this.id})}
     onProgress?.({phase:'done',label:'学習完了',progress:1});
     return{model,dataset,pluginId:this.id};
   }
@@ -72,7 +73,7 @@ const perceptionPlugin=new DescriptorOnlyLearningPlugin({
     datasetSchema:{type:'image_annotation',observation:['rgb','depth?'],target:['bbox','mask','keypoints','pose']},
     trainingParameters:[],
     evaluationParameters:[{key:'trials',label:'Trials',type:'number',default:20,min:1,max:100,step:1},{key:'seed',label:'Seed',type:'number',default:42,step:1}],
-    evaluationMetrics:[metric('successRate','検出成功率','percent'),metric('avgControlTicks','処理Step','integer')],
+    evaluationMetrics:[successMetric(),metric('avgControlTicks','処理Step','integer','',{better:'lower'})],
     visualizations:[{id:'detection_examples',type:'capability_note',title:'将来の可視化',text:'検出画像 / PR Curve / Confusion Matrix / Pose Error'}],
     note:'Camera観測を追加したときに、画像Dataset・Detector/VLM学習・知覚評価をこのPluginへ実装します。'
   }
@@ -86,7 +87,7 @@ const manipulationPlugin=new DescriptorOnlyLearningPlugin({
     datasetSchema:{type:'trajectory',observation:['robot_state','fork_state','camera?','depth?'],action:['fork','speed','steering']},
     trainingParameters:[],
     evaluationParameters:[{key:'trials',label:'Trials',type:'number',default:20,min:1,max:100,step:1},{key:'seed',label:'Seed',type:'number',default:42,step:1}],
-    evaluationMetrics:[metric('successRate','成功率','percent'),metric('avgControlTicks','平均制御Step','integer')],
+    evaluationMetrics:[successMetric(),metric('avgControlTicks','平均制御Step','integer','',{better:'lower'})],
     visualizations:[{id:'manipulation_future',type:'capability_note',title:'将来の可視化',text:'Action系列 / 接触位置 / 3D軌跡 / 成功・失敗リプレイ'}],
     note:'現在のSimulatorでは操作が瞬時状態遷移です。物理自由度を追加後、このPluginを具体実装へ差し替えます。'
   }
