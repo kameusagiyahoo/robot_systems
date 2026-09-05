@@ -7,6 +7,7 @@ export class SkillRuntimePolicyAdapter {
   }
 
   supports(_skillId,_policy='learned'){return false}
+  getRequiredDomainServices(_skillId){return[]}
 
   describe(skillId){
     return{
@@ -14,7 +15,8 @@ export class SkillRuntimePolicyAdapter {
       label:this.label,
       version:this.version,
       skillId,
-      policies:['learned']
+      policies:['learned'],
+      requiredDomainServices:this.getRequiredDomainServices(skillId)
     };
   }
 
