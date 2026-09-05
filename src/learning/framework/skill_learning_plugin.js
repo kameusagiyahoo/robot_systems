@@ -8,6 +8,7 @@ export class SkillLearningPlugin{
   getAlgorithms(){return[]}
   getDatasetSchema(){return null}
   getDatasetAdapter(){return null}
+  getDemonstrationRecorderAdapter(){return null}
   getTrainingBackend(){return null}
   getTrainingParameters(){return[]}
   getEvaluationParameters(){return[]}
@@ -22,7 +23,7 @@ export class SkillLearningPlugin{
     return defaultEvaluator(skillId,options);
   }
   describe(skillId){
-    const evaluationMetrics=this.getEvaluationMetrics(skillId),runtimeAdapter=this.getRuntimePolicyAdapter(skillId),scenarioAdapter=this.getEvaluationScenarioAdapter(skillId),datasetAdapter=this.getDatasetAdapter(skillId),trainingBackend=this.getTrainingBackend(skillId);
+    const evaluationMetrics=this.getEvaluationMetrics(skillId),runtimeAdapter=this.getRuntimePolicyAdapter(skillId),scenarioAdapter=this.getEvaluationScenarioAdapter(skillId),datasetAdapter=this.getDatasetAdapter(skillId),recorderAdapter=this.getDemonstrationRecorderAdapter(skillId),trainingBackend=this.getTrainingBackend(skillId);
     return{
       pluginId:this.id,
       pluginLabel:this.label,
@@ -31,6 +32,7 @@ export class SkillLearningPlugin{
       algorithms:this.getAlgorithms(skillId),
       datasetSchema:this.getDatasetSchema(skillId),
       datasetAdapter:datasetAdapter?.describe?.(skillId)||null,
+      demonstrationRecorderAdapter:recorderAdapter?.describe?.(skillId)||null,
       trainingBackend:trainingBackend?.describe?.(skillId)||null,
       trainingParameters:this.getTrainingParameters(skillId),
       evaluationParameters:this.getEvaluationParameters(skillId),
@@ -52,6 +54,7 @@ export class DescriptorOnlyLearningPlugin extends SkillLearningPlugin{
   getAlgorithms(skillId){return this.value('algorithms',skillId,[])}
   getDatasetSchema(skillId){return this.value('datasetSchema',skillId,null)}
   getDatasetAdapter(skillId){return this.value('datasetAdapter',skillId,null)}
+  getDemonstrationRecorderAdapter(skillId){return this.value('demonstrationRecorderAdapter',skillId,null)}
   getTrainingBackend(skillId){return this.value('trainingBackend',skillId,null)}
   getTrainingParameters(skillId){return this.value('trainingParameters',skillId,[])}
   getEvaluationParameters(skillId){return this.value('evaluationParameters',skillId,[])}
