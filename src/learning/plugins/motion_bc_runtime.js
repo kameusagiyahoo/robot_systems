@@ -9,8 +9,14 @@ const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 
 export class MotionBehaviorCloningRuntimeAdapter extends SkillRuntimePolicyAdapter{
-  constructor(){super({id:'motion_bc_runtime',label:'Motion BC Runtime',version:1});this.models=new Map();this.alignModel=null}
+  constructor(){super({id:'motion_bc_runtime',label:'Motion BC Runtime',version:2});this.models=new Map();this.alignModel=null}
   supports(skillId,policy='learned'){return policy==='learned'&&['navigate_to_pallet','align_to_pallet','navigate_to','retreat'].includes(skillId)}
+  getRequiredDomainServices(skillId){
+    if(skillId==='navigate_to_pallet')return['path.palletApproach'];
+    if(skillId==='navigate_to')return['path.to'];
+    return[];
+  }
+  describe(skillId){return{...super.describe(skillId),requiredDomainServices:this.getRequiredDomainServices(skillId)}}
 
   modelFor(skillId){
     if(skillId==='align_to_pallet'){
@@ -81,17 +87,19 @@ export class MotionBehaviorCloningRuntimeAdapter extends SkillRuntimePolicyAdapt
   }
 
   async execute(skillId,args={},context={}){
-    const {store,robot,services={}}=context,s=store.state;
+    const {store,robot,domainServices}=context,s=store.state;
     if(skillId==='align_to_pallet')return this.learnedAlign(args,{store,robot});
     if(skillId==='retreat')return this.learnedRetreat({store,robot});
     if(skillId==='navigate_to_pallet'){
       const p=s.pallets[args.palletId];if(!p)return{ok:false,reason:'pallet_not_found'};
-      const path=services.palletApproachPath?services.palletApproachPath(p):[{x:p.x-170,y:p.y},{x:p.x-125,y:p.y}],m=await this.learnedFollowPath(skillId,path,{store,robot,tolerance:12,maxTicks:900,maxSpeedOverride:55});
+      if(!domainServices?.has('path.palletApproach'))return{ok:false,reason:'domain_service_missing:path.palletApproach'};
+      const path=domainServices.call('path.palletApproach',p),m=await this.learnedFollowPath(skillId,path,{store,robot,tolerance:12,maxTicks:900,maxSpeedOverride:55});
       return m.ok?{ok:true,message:`approached ${p.label} (learned_bc)`,ticks:m.ticks,policy:'learned_bc'}:{ok:false,reason:m.reason};
     }
     if(skillId==='navigate_to'){
       const l=s.locations[args.locationId];if(!l)return{ok:false,reason:'location_not_found'};
-      const target={x:l.x-75,y:l.y},path=services.pathTo?services.pathTo(target):[target],m=await this.learnedFollowPath(skillId,path,{store,robot,tolerance:12,maxTicks:900,maxSpeedOverride:55});
+      if(!domainServices?.has('path.to'))return{ok:false,reason:'domain_service_missing:path.to'};
+      const target={x:l.x-75,y:l.y},path=domainServices.call('path.to',target),m=await this.learnedFollowPath(skillId,path,{store,robot,tolerance:12,maxTicks:900,maxSpeedOverride:55});
       return m.ok?{ok:true,message:`followed path to ${l.label} (learned_bc)`,ticks:m.ticks,policy:'learned_bc'}:{ok:false,reason:m.reason};
     }
     return{ok:false,reason:`unsupported_learned_runtime_skill:${skillId}`};
