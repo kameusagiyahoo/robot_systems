@@ -19,7 +19,7 @@ const episodes=new EpisodeLogger();
 let running=false;
 
 function log(type,msg){const d=document.createElement('div');d.className=`log-line ${type}`;const t=new Date().toLocaleTimeString();d.innerHTML=`<span class="time">${t}</span> ${msg}`;$('#log').appendChild(d);$('#log').scrollTop=$('#log').scrollHeight}
-function render(s){renderer.draw(s);$('#robotState').textContent=JSON.stringify(s.robot,null,2);$('#agentState').textContent=JSON.stringify({task:s.task,agent:s.agent,perception:s.perception,failures:s.failures,obstacle:s.obstacle.enabled},null,2);renderHistory(s);syncFailureControls(s);renderMetrics()}
+function render(s){renderer.draw(s);$('#robotState').textContent=JSON.stringify({robot:s.robot,simulation:s.simulation},null,2);$('#agentState').textContent=JSON.stringify({task:s.task,agent:s.agent,perception:s.perception,failures:s.failures,obstacle:s.obstacle.enabled},null,2);renderHistory(s);syncFailureControls(s);renderMetrics()}
 function renderHistory(s){const q=$('#skillQueue');q.innerHTML='';if(!s.agent.history.length){q.innerHTML='<div class="hint">No decisions yet.</div>';return;}s.agent.history.slice().reverse().forEach((h,i)=>{const e=document.createElement('div');e.className='skill-item '+(i===0?'current':'done');e.innerHTML=`<span>#${h.step} ${h.skill}${h.recovery?' ↻ recovery':''}</span><code>${JSON.stringify(h.result)}</code>`;q.appendChild(e)})}
 function syncFailureControls(s){$('#obstacleToggle').checked=s.obstacle.enabled;$('#detectFailToggle').checked=s.failures.forceDetectionFailure;$('#alignFailToggle').checked=s.failures.forceAlignmentFailure;$('#insertFailToggle').checked=s.failures.forceInsertionFailure}
 function renderMetrics(){const ep=episodes.current||episodes.completed.at(-1);$('#episodeState').textContent=ep?JSON.stringify({id:ep.id,status:ep.status||'running',metrics:ep.metrics},null,2):'No episode yet.'}
@@ -35,7 +35,7 @@ async function makePlan(){
   episodes.start(store.state.task);renderMetrics();log('planner',`Task parsed → source=${store.state.task.source}, destination=${store.state.task.destination}`);return true;
 }
 
-function finishEpisode(success,status){const ep=episodes.finish(success,status);renderMetrics();if(ep)log(success?'success':'error',`Episode ${ep.id} → ${status}; steps=${ep.metrics.stepCount}, failures=${ep.metrics.failures}, recoveries=${ep.metrics.recoveries}`)}
+function finishEpisode(success,status){const ep=episodes.finish(success,status);renderMetrics();if(ep)log(success?'success':'error',`Episode ${ep.id} → ${status}; steps=${ep.metrics.stepCount}, failures=${ep.metrics.failures}, recoveries=${ep.metrics.recoveries}, collisions=${ep.metrics.collisions}`)}
 
 async function step(){
   const s=store.state;
@@ -74,5 +74,5 @@ $('#planBtn').onclick=makePlan;$('#stepBtn').onclick=step;$('#runBtn').onclick=r
 $('#resetBtn').onclick=()=>{running=false;if(episodes.current)episodes.finish(false,'reset');store.reset();renderMetrics();log('planner','System reset')};
 $('#clearLogBtn').onclick=()=>$('#log').innerHTML='';$('#downloadEpisodeBtn').onclick=downloadEpisode;
 $('#obstacleToggle').onchange=e=>setFailure('obstacle',e.target.checked,'Obstacle');$('#detectFailToggle').onchange=e=>setFailure('forceDetectionFailure',e.target.checked,'Detection failure');$('#alignFailToggle').onchange=e=>setFailure('forceAlignmentFailure',e.target.checked,'Alignment failure');$('#insertFailToggle').onchange=e=>setFailure('forceInsertionFailure',e.target.checked,'Insertion failure');
-document.querySelectorAll('[data-manual]').forEach(b=>b.onclick=()=>{const a=b.dataset.manual;if(a==='forward')robot.sendAction({type:'move',dx:0,dy:-18});if(a==='back')robot.sendAction({type:'move',dx:0,dy:18});if(a==='left')robot.sendAction({type:'move',dx:-18,dy:0});if(a==='right')robot.sendAction({type:'move',dx:18,dy:0});if(a==='lift')robot.sendAction({type:'fork',raised:!store.state.robot.forkRaised})});
-log('planner','Ready: v0.9 Planner → Skill contracts → Policy → Robot + Replanning + Episode logging');
+document.querySelectorAll('[data-manual]').forEach(b=>b.onclick=()=>{const a=b.dataset.manual;if(a==='forward')robot.sendAction({type:'drive',speed:60,steeringAngle:0});if(a==='back')robot.sendAction({type:'drive',speed:-45,steeringAngle:0});if(a==='left')robot.sendAction({type:'drive',speed:35,steeringAngle:25});if(a==='right')robot.sendAction({type:'drive',speed:35,steeringAngle:-25});if(a==='lift')robot.sendAction({type:'fork',raised:!store.state.robot.forkRaised})});
+log('planner','Ready: v1.1 rear-steer bicycle model + acceleration/steering limits + tick collision checks');
