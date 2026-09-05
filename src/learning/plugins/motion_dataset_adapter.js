@@ -20,21 +20,26 @@ function extractSamples(input){
 }
 
 export class MotionDatasetAdapter extends SkillDatasetAdapter{
-  constructor(){super({id:'motion_dataset',label:'Motion Observation/Action Dataset',version:1})}
+  constructor(){super({id:'motion_dataset',label:'Motion Observation/Action Dataset',version:2})}
   supports(skillId){return['navigate_to_pallet','align_to_pallet','navigate_to','retreat'].includes(skillId)}
   getSources(){return[
     {id:'synthetic_expert',label:'Synthetic Expert',kind:'generated'},
-    {id:'manual_import',label:'Manual / Imported Demo',kind:'local'}
+    {id:'manual_import',label:'Manual / Recorded Demo',kind:'local'}
   ]}
   async buildTrainingDataset(skillId,{source='synthetic_expert',samples=2500,seed=42}={}){
     if(source==='synthetic_expert')return{source,samples:null,requestedSamples:Number(samples)||2500,seed:Number(seed)||42};
     if(source==='manual_import'){
-      const demos=read(skillId);if(!demos.length)throw new Error('manual_dataset_empty_import_json_first');
+      const demos=read(skillId);if(!demos.length)throw new Error('manual_dataset_empty_record_or_import_first');
       return{source,samples:demos,requestedSamples:demos.length,seed:Number(seed)||42};
     }
     throw new Error(`unsupported_dataset_source:${source}`);
   }
-  appendManualSample(skillId,sample){const normalized=normalizeSample(sample);if(!normalized)throw new Error('invalid_manual_sample');const samples=read(skillId);samples.push(normalized);write(skillId,samples);return samples.length}
+  appendManualSample(skillId,sample){return this.appendManualSamples(skillId,[sample])}
+  appendManualSamples(skillId,input){
+    const incoming=(Array.isArray(input)?input:[input]).map(normalizeSample).filter(Boolean);
+    if(!incoming.length)return read(skillId).length;
+    const samples=read(skillId);samples.push(...incoming);write(skillId,samples);return samples.length;
+  }
   loadManualSamples(skillId){return read(skillId)}
   clearManualSamples(skillId){localStorage.removeItem(key(skillId))}
   async importDataset(skillId,input){
@@ -44,9 +49,9 @@ export class MotionDatasetAdapter extends SkillDatasetAdapter{
   exportDataset(skillId,{format='portable'}={}){
     const samples=read(skillId);
     if(format==='lerobot_intermediate'){
-      return{schema:'robot_systems.lerobot_intermediate.v1',note:'Intermediate JSON for later conversion to an official LeRobotDataset; not an official LeRobotDataset by itself.',skillId,features:{observation:requiredObs,action:requiredAction},records:samples.map(s=>({observation:s.obs,action:s.action}))};
+      return{schema:'robot_systems.lerobot_intermediate.v1',note:'Intermediate JSON for later conversion to an official LeRobotDataset; not an official LeRobotDataset by itself.',skillId,features:{observation:requiredObs,action:requiredAction},records:samples.map((s,index)=>({index,observation:s.obs,action:s.action}))};
     }
-    return{schema:'robot_systems.skill_dataset.v1',skillId,adapterId:this.id,samples};
+    return{schema:'robot_systems.skill_dataset.v1',skillId,adapterId:this.id,adapterVersion:this.version,generatedAt:new Date().toISOString(),samples};
   }
   describe(skillId){return{...super.describe(skillId),manualSamples:read(skillId).length,portableSchemas:['robot_systems.skill_dataset.v1','robot_systems.lerobot_intermediate.v1']}}
 }
