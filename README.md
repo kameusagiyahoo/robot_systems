@@ -18,7 +18,12 @@
 - Classic vs Learned comparison
 - seeded benchmark / evaluation history
 - Episode logging and JSON/CSV export
-- plugin-based **Skill Learning Framework v2.2**
+- plugin-based **Skill Learning Framework v2.3**
+- Web Worker training backend for motion BC
+- Dataset Adapter with synthetic/manual-import workflows
+- LeRobot conversion用 intermediate JSON export
+- Plugin/Policy/Model/Dataset metadata in Episode logs
+- named Domain Service contracts for learned runtimes
 
 ## Architecture
 
@@ -50,19 +55,19 @@ Observation / Result
 
 ```text
 Skill
-├ Runtime Policy Adapter
 ├ Dataset Adapter
-├ Training Plugin
+├ Training Backend
+├ Runtime Policy Adapter
 ├ Evaluation Scenario Adapter
 ├ Evaluation Metrics
 └ Visualization Adapter
 ```
 
-SkillごとにDataset、Algorithm、Runtime、評価Scenario、評価指標、可視化を差し替えます。
+SkillごとにDataset、Algorithm、Training Backend、Runtime、評価Scenario、評価指標、可視化を差し替えます。
 
 現在の例:
 
-- Motion Skills → Behavior Cloning plugin + Motion BC Runtime
+- Motion Skills → Behavior Cloning plugin + Motion Dataset Adapter + Web Worker Training + Motion BC Runtime
 - DetectPallet → future Perception plugin
 - Insert/Lift/Place → future Manipulation plugin
 
@@ -74,13 +79,25 @@ SkillごとにDataset、Algorithm、Runtime、評価Scenario、評価指標、�
 src/learning/framework/
   skill_learning_plugin.js
   plugin_registry.js
+  dataset_adapter.js
+  training_backend.js
   runtime_policy_adapter.js
   runtime_router.js
   evaluation_scenario_adapter.js
   visualization_renderer.js
+  episode_metadata.js
+  domain_service_interface.js
+
+src/learning/algorithms/
+  motion_bc_core.js
+
+src/learning/workers/
+  motion_bc_training_worker.js
 
 src/learning/plugins/
   default_skill_plugins.js
+  motion_dataset_adapter.js
+  motion_bc_training_backend.js
   motion_bc_runtime.js
   forklift_evaluation_scenarios.js
 
@@ -88,6 +105,24 @@ src/learning/ui/
   learning_page.js
   evaluation_page.js
 ```
+
+### Training route
+
+```text
+Learning UI
+  ↓
+Skill Plugin
+  ↓
+Dataset Adapter
+  ↓
+Training Backend
+  ↓
+Web Worker
+  ↓
+Model
+```
+
+Motion BCはWeb Workerで学習します。Workerが利用できない場合のみmain thread fallbackします。
 
 ### Runtime route
 
@@ -97,6 +132,15 @@ SkillExecutor
 selected policy?
   ├ Classic → RulePolicy / controller
   └ Learned → Runtime Router → Skill Plugin Runtime Adapter
+```
+
+Learned Runtimeが必要とするSimulator機能はDomain Service Provider経由で渡します。
+
+```text
+path.to
+path.palletApproach
+state.get
+state.emit
 ```
 
 `RulePolicy` はClassic制御だけを担当し、BC/ACT/SAC等の学習方式固有Runtimeを直接持たない方針です。
@@ -119,6 +163,17 @@ Evaluation Scenario Adapter
 ```
 
 `skill_evaluator.js` はSkill固有の初期条件生成を持たず、Scenario Adapterへ委譲します。
+
+### Dataset interchange
+
+現在のMotion Dataset Adapterは以下を扱います。
+
+- synthetic expert
+- imported observation/action JSON
+- portable skill dataset JSON
+- LeRobot conversion用 intermediate JSON
+
+LeRobot intermediate JSONは公式LeRobotDatasetそのものではありません。PC/Workstation側で公式形式へ変換するための中間形式です。
 
 ## Research migration path
 
