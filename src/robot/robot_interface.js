@@ -1,0 +1,1 @@
+export class RobotInterface{connect(){throw new Error('not implemented')}getObservation(){throw new Error('not implemented')}sendAction(_action){throw new Error('not implemented')}disconnect(){throw new Error('not implemented')}}
