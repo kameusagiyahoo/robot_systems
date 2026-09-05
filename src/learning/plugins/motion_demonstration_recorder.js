@@ -38,7 +38,7 @@ function observationFor(skillId,state,session){
 
 export class MotionDemonstrationRecorderAdapter extends SkillDemonstrationRecorderAdapter{
   constructor(datasetAdapter){
-    super({id:'motion_manual_demo_recorder',label:'Motion Manual Demonstration Recorder',version:1});
+    super({id:'motion_manual_demo_recorder',label:'Motion Manual Demonstration Recorder',version:2});
     this.datasetAdapter=datasetAdapter;this.session=null;
   }
   supports(skillId){return['navigate_to_pallet','align_to_pallet','navigate_to','retreat'].includes(skillId)}
@@ -64,8 +64,8 @@ export class MotionDemonstrationRecorderAdapter extends SkillDemonstrationRecord
     const session=this.session;this.session=null;
     if(!save)return{saved:0,total:session.samples.length,active:false,discarded:true};
     if(session.replace)this.datasetAdapter.clearManualSamples(skillId);
-    const total=this.datasetAdapter.appendManualSamples(skillId,session.samples);
-    return{saved:session.samples.length,total,active:false,startedAt:session.startedAt,endedAt:new Date().toISOString()};
+    const total=this.datasetAdapter.appendManualSamples(skillId,session.samples),summary=this.datasetAdapter.summarizeManualSamples?.(skillId)||null;
+    return{saved:session.samples.length,total,summary,active:false,startedAt:session.startedAt,endedAt:new Date().toISOString()};
   }
   discard(skillId){return this.stop(skillId,{save:false})}
   status(){return this.session?{active:true,skillId:this.session.skillId,samples:this.session.samples.length,startedAt:this.session.startedAt,target:this.session.target}:{active:false,samples:0}}
