@@ -1,4 +1,5 @@
 import {SkillDemonstrationRecorderAdapter} from '../framework/demonstration_recorder_adapter.js';
+import {saveDatasetMeta} from '../skill_learning_registry.js';
 
 const wrap=d=>((d+180)%360+360)%360-180;
 const deg2rad=d=>d*Math.PI/180;
@@ -38,7 +39,7 @@ function observationFor(skillId,state,session){
 
 export class MotionDemonstrationRecorderAdapter extends SkillDemonstrationRecorderAdapter{
   constructor(datasetAdapter){
-    super({id:'motion_manual_demo_recorder',label:'Motion Manual Demonstration Recorder',version:2});
+    super({id:'motion_manual_demo_recorder',label:'Motion Manual Demonstration Recorder',version:3});
     this.datasetAdapter=datasetAdapter;this.session=null;
   }
   supports(skillId){return['navigate_to_pallet','align_to_pallet','navigate_to','retreat'].includes(skillId)}
@@ -64,8 +65,9 @@ export class MotionDemonstrationRecorderAdapter extends SkillDemonstrationRecord
     const session=this.session;this.session=null;
     if(!save)return{saved:0,total:session.samples.length,active:false,discarded:true};
     if(session.replace)this.datasetAdapter.clearManualSamples(skillId);
-    const total=this.datasetAdapter.appendManualSamples(skillId,session.samples),summary=this.datasetAdapter.summarizeManualSamples?.(skillId)||null;
-    return{saved:session.samples.length,total,summary,active:false,startedAt:session.startedAt,endedAt:new Date().toISOString()};
+    const total=this.datasetAdapter.appendManualSamples(skillId,session.samples),summary=this.datasetAdapter.summarizeManualSamples?.(skillId)||null,endedAt=new Date().toISOString();
+    saveDatasetMeta(skillId,{kind:'manual_recorded',samples:total,recordedAt:endedAt,datasetAdapterId:this.datasetAdapter.id,datasetAdapterVersion:this.datasetAdapter.version,demonstrationRecorderAdapterId:this.id,demonstrationRecorderAdapterVersion:this.version,featureSummary:summary?.featureSummary||null,preview:summary?.preview||null});
+    return{saved:session.samples.length,total,summary,active:false,startedAt:session.startedAt,endedAt};
   }
   discard(skillId){return this.stop(skillId,{save:false})}
   status(){return this.session?{active:true,skillId:this.session.skillId,samples:this.session.samples.length,startedAt:this.session.startedAt,target:this.session.target}:{active:false,samples:0}}
