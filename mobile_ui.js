@@ -1,0 +1,8 @@
+const BC_KEY='forklift_bc_align_v1';
+const $=s=>document.querySelector(s);
+function readModel(){try{return JSON.parse(localStorage.getItem(BC_KEY)||'null')}catch{return null}}
+function renderModelState(){const model=readModel();const method=$('#alignMethodState'),state=$('#alignModelState');if(method)method.textContent=model?'Behavior Cloning':'Rule staged docking';if(state)state.textContent=model?`学習済み · ${model.samples||'?'} samples`:'未学習'}
+function openSheet(id){const d=document.getElementById(id);if(!d)return;renderModelState();if(typeof d.showModal==='function')d.showModal();else d.setAttribute('open','')}
+function closeSheet(d){if(!d)return;if(typeof d.close==='function')d.close();else d.removeAttribute('open')}
+function install(){document.querySelectorAll('[data-open-sheet]').forEach(btn=>btn.addEventListener('click',()=>openSheet(btn.dataset.openSheet)));document.querySelectorAll('[data-close-sheet]').forEach(btn=>btn.addEventListener('click',()=>closeSheet(btn.closest('dialog'))));document.querySelectorAll('dialog.bottom-sheet').forEach(d=>d.addEventListener('click',e=>{const r=d.getBoundingClientRect();if(e.clientY<r.top||e.clientY>r.bottom||e.clientX<r.left||e.clientX>r.right)closeSheet(d)}));window.addEventListener('pipeline:model',renderModelState);window.addEventListener('focus',renderModelState);renderModelState()}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
