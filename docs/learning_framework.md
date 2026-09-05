@@ -4,16 +4,17 @@
 
 学習方法を全Skillで統一しない。
 
-共通化するのは **学習の枠組み** だけで、Dataset / Algorithm / Evaluation / Visualization はSkillごとのPluginが定義する。
+共通化するのは **学習の枠組み** だけで、Dataset / Algorithm / Runtime / Evaluation / Visualization はSkillごとのPluginが定義する。
 
 ```text
 Task
   ↓
 Skill
-  ├ Runtime Policy
+  ├ Runtime Policy Adapter
   ├ Dataset Adapter
   ├ Training Plugin
-  ├ Evaluation Adapter
+  ├ Evaluation Scenario Adapter
+  ├ Evaluation Metrics
   └ Visualization Adapter
 ```
 
@@ -35,6 +36,8 @@ Pluginは以下を提供できる。
 - training parameters
 - evaluation parameters
 - evaluation metrics
+- runtime policy adapter
+- evaluation scenario adapter
 - visualization definitions
 - `train()`
 - `evaluate()`
@@ -45,7 +48,53 @@ Pluginは以下を提供できる。
 
 Skill IDとLearning Pluginを結び付ける。
 
-UIは具体的なBC/YOLO/ACT等を直接知らず、Registry経由でPlugin Descriptorを読む。
+UI、Runtime Router、Skill Evaluatorは具体的なBC/YOLO/ACT等を直接知らず、Registry経由でPluginを取得する。
+
+## Runtime Policy Adapter
+
+`src/learning/framework/runtime_policy_adapter.js`
+
+Learned RuntimeをRulePolicyへ直接書き込まない。
+
+```text
+SkillExecutor
+  ↓
+Runtime Router
+  ├ classic → existing Policy
+  └ learned → Plugin Runtime Adapter
+```
+
+`src/skills/skills.js` が `runtime_router.js` を呼び出す。
+
+現在のMotion BC実装は:
+
+`src/learning/plugins/motion_bc_runtime.js`
+
+に分離した。
+
+そのため将来、ACT / SAC / VLA / Detector Runtime等を導入するときは、原則としてRulePolicyへ学習アルゴリズム固有コードを追加しない。
+
+## Evaluation Scenario Adapter
+
+`src/learning/framework/evaluation_scenario_adapter.js`
+
+Skill評価で使う以下の内容もPlugin側の責務にする。
+
+- Runtime生成
+- 初期条件生成
+- Skill入力生成
+- trial metric計測
+- aggregate
+
+`src/evaluation/skill_evaluator.js` は現在、Skill固有の `switch(skillId)` を持たない。
+
+現在のフォークリフト用Scenarioは:
+
+`src/learning/plugins/forklift_evaluation_scenarios.js`
+
+にある。
+
+将来Camera perceptionや3D manipulationを追加するときは、そのPlugin専用Scenario Adapterへ差し替える。
 
 ## Current default plugins
 
@@ -62,7 +111,8 @@ UIは具体的なBC/YOLO/ACT等を直接知らず、Registry経由でPlugin Desc
 
 - Dataset: synthetic expert observation/action
 - Algorithm: Behavior Cloning
-- Runtime: Classic / Learned
+- Runtime Adapter: Motion BC Runtime
+- Evaluation Scenario: Forklift Motion Scenarios
 - Evaluation: success / collision / control steps / final error (+ skill-specific metrics)
 - Visualization:
   - training loss curve
@@ -77,14 +127,14 @@ UIは具体的なBC/YOLO/ACT等を直接知らず、Registry経由でPlugin Desc
 
 - DetectPallet
 
-将来想定:
+現在はフォークリフトの簡易Scenario Adapterを使うが、将来は以下へ差し替える。
 
 - RGB / Depth dataset
 - Detector / Segmentation / VLM
+- perception runtime adapter
+- camera-specific evaluation scenario
 - Precision / Recall / mAP / pose error
 - detection examples / PR curve / confusion matrix
-
-Camera観測導入後、このPluginを具体実装へ差し替える。
 
 ### `manipulation_future`
 
@@ -94,10 +144,12 @@ Camera観測導入後、このPluginを具体実装へ差し替える。
 - Lift
 - Place
 
-将来想定:
+現在はフォークリフトの簡易Scenario Adapterを使うが、将来は以下へ差し替える。
 
 - trajectory dataset
 - BC / ACT / Diffusion Policy / RL
+- manipulation runtime adapter
+- physics/contact evaluation scenario
 - insertion success / contact / time / pose error
 - action sequence / contact map / 3D trajectory / replay
 
@@ -114,7 +166,7 @@ UI builds controls dynamically
   ↓
 Plugin train/evaluate
   ↓
-Plugin-defined visualizations / metrics
+Plugin-defined runtime / scenario / visualizations / metrics
 ```
 
 新しいPluginで必要なTraining ParameterやEvaluation Metricが変わっても、基本的にページ本体を変更しない。
@@ -149,15 +201,27 @@ Manipulation Pluginなら以下を追加できる。
 ## Important principle
 
 > Skill Learning Framework は共通。
-> Dataset / Algorithm / Evaluation / Visualization はSkill Pluginごとに異なってよい。
+> Dataset / Algorithm / Runtime / Evaluation / Visualization はSkill Pluginごとに異なってよい。
 
 「全SkillをBehavior Cloningにする」「全SkillでLoss graphを出す」といった設計にはしない。
 
+## Framework status
+
+- [x] Skill Learning Plugin interface
+- [x] Plugin Registry / Skill binding
+- [x] Dynamic training parameters
+- [x] Dynamic evaluation parameters / metrics
+- [x] Visualization Renderer registry
+- [x] Runtime Policy Adapter
+- [x] Learned Runtime routing from SkillExecutor
+- [x] Evaluation Scenario Adapter
+- [x] Skill evaluatorからscenario preparationを分離
+
 ## Next framework tasks
 
-- [ ] Runtime Policy自体もPlugin Adapter経由へ完全移行する
-- [ ] Skill evaluatorのscenario preparationをPlugin側へ移す
 - [ ] Web Worker training backendを追加してスマホUIをブロックしない
 - [ ] Dataset Adapterへmanual demonstration / LeRobotDatasetを追加
 - [ ] Visualization Rendererのplugin-local registrationを強化
-- [ ] Plugin metadata/versionをEpisodeログへ保存
+- [ ] Plugin metadata/version/runtime adapterをEpisodeログへ保存
+- [ ] Plugin単位のimport/export package形式を定義
+- [ ] Simulator固有service (`pathTo` 等) の依存をDomain Service interfaceとして明文化
