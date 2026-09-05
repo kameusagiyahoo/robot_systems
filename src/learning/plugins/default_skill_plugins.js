@@ -3,10 +3,13 @@ import {registerLearningPlugin} from '../framework/plugin_registry.js';
 import {BehaviorCloningSkill,generateSkillDemos} from '../behavior_cloning_skill.js';
 import {BehaviorCloningAlign,generateSyntheticDemos} from '../behavior_cloning_align.js';
 import {saveDatasetMeta,saveSkillModel} from '../skill_learning_registry.js';
+import {MotionBehaviorCloningRuntimeAdapter} from './motion_bc_runtime.js';
+import {motionScenarioAdapter,perceptionScenarioAdapter,manipulationScenarioAdapter} from './forklift_evaluation_scenarios.js';
 
 const MOTION_SKILLS=['navigate_to_pallet','align_to_pallet','navigate_to','retreat'];
 const metric=(key,label,format='number',unit='',extra={})=>({key,label,format,unit,...extra});
 const successMetric=()=>metric('successRate','成功率','percent','',{primary:true,better:'higher',goodThreshold:.8});
+const motionRuntimeAdapter=new MotionBehaviorCloningRuntimeAdapter();
 
 function datasetSummary(samples){
   const keys=['dx','dy','yawError','speed','steeringAngle'],features={};
@@ -21,7 +24,7 @@ function datasetSummary(samples){
 }
 
 class MotionBehaviorCloningPlugin extends SkillLearningPlugin{
-  constructor(){super({id:'motion_bc',label:'Motion Behavior Cloning',version:1})}
+  constructor(){super({id:'motion_bc',label:'Motion Behavior Cloning',version:2})}
   supports(skillId){return MOTION_SKILLS.includes(skillId)}
   getCapabilities(){return{trainable:true,evaluable:true,runtimeLearning:true,policies:['classic','learned']}}
   getAlgorithms(){return[{id:'behavior_cloning',label:'Behavior Cloning',kind:'imitation'}]}
@@ -46,7 +49,9 @@ class MotionBehaviorCloningPlugin extends SkillLearningPlugin{
     {id:'dataset_distribution',type:'dataset_distribution',title:'学習データ分布',source:'dataset.featureSummary'},
     {id:'policy_comparison',type:'policy_comparison',title:'Classic vs Learned',source:'evaluationHistory',metric:'successRate',format:'percent',better:'higher'}
   ]}
-  getNote(skillId){return`${skillId} 用の連続制御学習Plugin。Dataset / Training / Evaluation / VisualizationはPlugin側で定義します。`}
+  getRuntimePolicyAdapter(){return motionRuntimeAdapter}
+  getEvaluationScenarioAdapter(){return motionScenarioAdapter}
+  getNote(skillId){return`${skillId} 用の連続制御学習Plugin。Dataset / Training / Runtime / Evaluation Scenario / VisualizationをPlugin側で定義します。`}
   async train(skillId,{samples=2500,seed=42,onProgress=null}={}){
     if(!this.supports(skillId))throw new Error(`unsupported_skill_for_plugin:${skillId}`);
     const count=Math.max(200,Math.min(10000,Number(samples)||2500)),fixedSeed=Number(seed)||42;
@@ -66,7 +71,7 @@ class MotionBehaviorCloningPlugin extends SkillLearningPlugin{
 }
 
 const perceptionPlugin=new DescriptorOnlyLearningPlugin({
-  id:'perception_future',label:'Perception Learning Adapter',skills:['detect_pallet'],
+  id:'perception_future',label:'Perception Learning Adapter',version:2,skills:['detect_pallet'],
   descriptor:{
     capabilities:{trainable:false,evaluable:true,runtimeLearning:false,policies:['classic']},
     algorithms:[{id:'detector',label:'Detector / Segmentation / VLM',kind:'perception'}],
@@ -74,13 +79,14 @@ const perceptionPlugin=new DescriptorOnlyLearningPlugin({
     trainingParameters:[],
     evaluationParameters:[{key:'trials',label:'Trials',type:'number',default:20,min:1,max:100,step:1},{key:'seed',label:'Seed',type:'number',default:42,step:1}],
     evaluationMetrics:[successMetric(),metric('avgControlTicks','処理Step','integer','',{better:'lower'})],
+    evaluationScenarioAdapter:perceptionScenarioAdapter,
     visualizations:[{id:'detection_examples',type:'capability_note',title:'将来の可視化',text:'検出画像 / PR Curve / Confusion Matrix / Pose Error'}],
-    note:'Camera観測を追加したときに、画像Dataset・Detector/VLM学習・知覚評価をこのPluginへ実装します。'
+    note:'Camera観測を追加したときに、画像Dataset・Detector/VLM学習・知覚Runtime・知覚Scenarioへ差し替えます。'
   }
 });
 
 const manipulationPlugin=new DescriptorOnlyLearningPlugin({
-  id:'manipulation_future',label:'Manipulation Learning Adapter',skills:['insert_forks','lift','place'],
+  id:'manipulation_future',label:'Manipulation Learning Adapter',version:2,skills:['insert_forks','lift','place'],
   descriptor:{
     capabilities:{trainable:false,evaluable:true,runtimeLearning:false,policies:['classic']},
     algorithms:[{id:'sequence_policy',label:'BC / ACT / Diffusion Policy / RL',kind:'manipulation'}],
@@ -88,8 +94,9 @@ const manipulationPlugin=new DescriptorOnlyLearningPlugin({
     trainingParameters:[],
     evaluationParameters:[{key:'trials',label:'Trials',type:'number',default:20,min:1,max:100,step:1},{key:'seed',label:'Seed',type:'number',default:42,step:1}],
     evaluationMetrics:[successMetric(),metric('avgControlTicks','平均制御Step','integer','',{better:'lower'})],
+    evaluationScenarioAdapter:manipulationScenarioAdapter,
     visualizations:[{id:'manipulation_future',type:'capability_note',title:'将来の可視化',text:'Action系列 / 接触位置 / 3D軌跡 / 成功・失敗リプレイ'}],
-    note:'現在のSimulatorでは操作が瞬時状態遷移です。物理自由度を追加後、このPluginを具体実装へ差し替えます。'
+    note:'現在のSimulatorでは操作が瞬時状態遷移です。物理自由度を追加後、Runtime/Scenarioを含めてPluginを具体実装へ差し替えます。'
   }
 });
 
