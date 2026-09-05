@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>Forklift Agent Lab v2.3</title>
+  <title>Forklift Agent Lab v2.4</title>
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
 <header class="mobile-header">
-  <div><strong>Forklift Agent Lab</strong><span>Skill Learning Framework v2.3</span></div>
+  <div><strong>Forklift Agent Lab</strong><span>Skill Learning Framework v2.4</span></div>
   <div id="statusBadge" class="status-badge idle">待機中</div>
 </header>
 
@@ -43,7 +43,7 @@
 <nav class="bottom-nav" aria-label="補助メニュー">
   <button data-open-sheet="learnSheet"><span>Skill</span><small>学習・評価</small></button>
   <button data-open-sheet="logSheet"><span>ログ</span><small>原因</small></button>
-  <button data-open-sheet="settingsSheet"><span>研究設定</span><small>比較</small></button>
+  <button data-open-sheet="settingsSheet"><span>研究設定</span><small>比較・記録</small></button>
 </nav>
 
 <div class="runtime-hidden" aria-hidden="true">
@@ -70,6 +70,29 @@
   <div class="sheet-head"><div><small>通常は触らなくてOK</small><h2>研究者向け設定</h2></div><button data-close-sheet>×</button></div>
   <div class="sheet-body settings-scroll">
     <details open>
+      <summary>Demonstration Recorder / 手動操作</summary>
+      <p class="sheet-note">記録対象Skillを選び、「記録開始」後に方向ボタンを長押しします。Observation + ActionがそのSkillのDataset Adapterへ保存されます。</p>
+      <div class="form-grid">
+        <label>記録するSkill<select id="demoSkill"></select></label>
+        <label class="demo-replace-label"><span>Dataset</span><span><input id="demoReplaceToggle" type="checkbox"> 既存デモを置換</span></label>
+      </div>
+      <div class="sheet-actions">
+        <button id="demoRecordBtn" class="primary">● 記録開始</button>
+        <button id="demoStopBtn" disabled>■ 保存して停止</button>
+        <button id="demoDiscardBtn" disabled>破棄</button>
+      </div>
+      <div id="demoRecordState" class="demo-record-state">Recorder: 待機中</div>
+      <div class="manual-controls">
+        <button data-manual="forward">↑ 前進</button>
+        <button data-manual="left">← 左</button>
+        <button data-manual="right">右 →</button>
+        <button data-manual="back">↓ 後退</button>
+        <button data-manual="lift">Fork</button>
+      </div>
+      <div class="sheet-actions"><button id="stepBtn">1 Step</button><button id="planBtn">Task解析</button></div>
+    </details>
+
+    <details>
       <summary>Controller</summary>
       <div class="form-grid">
         <label>方式<select id="controllerSelect"><option value="pure_pursuit">Pure Pursuit</option><option value="rule_waypoint">Rule Waypoint</option><option value="pid_path">PID Path</option></select></label>
@@ -81,8 +104,6 @@
     <details><summary>Failure Lab</summary><div class="toggle-list"><label><input id="obstacleToggle" type="checkbox"> 障害物</label><label><input id="detectFailToggle" type="checkbox"> 検出を強制失敗</label><label><input id="alignFailToggle" type="checkbox"> 位置合わせを強制失敗</label><label><input id="insertFailToggle" type="checkbox"> 差し込みを強制失敗</label></div></details>
 
     <details><summary>Benchmark</summary><div class="form-grid"><label>Seed<input id="benchmarkSeed" type="text" value="42"></label><label>Scenarios<input id="benchmarkScenarios" type="number" min="1" max="50" value="8"></label></div><div class="sheet-actions"><button id="batchBtn" class="primary">実行</button><button id="benchmarkJsonBtn">JSON</button><button id="benchmarkCsvBtn">CSV</button><button class="copy-btn" data-copy-target="batchState">コピー</button></div><pre id="batchState" class="data-box small">No benchmark result yet.</pre></details>
-
-    <details><summary>手動操作 / 1 Step</summary><div class="sheet-actions"><button id="stepBtn">1 Step</button><button id="planBtn">Task解析</button></div><div class="manual-controls"><button data-manual="forward">↑ 前進</button><button data-manual="left">← 左</button><button data-manual="right">右 →</button><button data-manual="back">↓ 後退</button><button data-manual="lift">Fork</button></div></details>
 
     <details><summary>内部データ</summary>
       <h3>Episode</h3><div class="sheet-actions"><button class="copy-btn" data-copy-target="episodeState">コピー</button><button id="downloadEpisodeBtn">JSON保存</button></div><pre id="episodeState" class="data-box"></pre>
