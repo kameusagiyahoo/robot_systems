@@ -1,19 +1,21 @@
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 const wrap=d=>((d+180)%360+360)%360-180;
 const KEY='forklift_bc_align_v1';
+const POLICY_KEY='forklift_skill_policy_v1:align_to_pallet';
 
 function features(o){
   const yaw=wrap(o.yawError)*Math.PI/180;
   return [clamp(o.dx/160,-2,2),clamp(o.dy/120,-2,2),Math.sin(yaw),Math.cos(yaw),clamp(o.speed/70,-1.5,1.5),clamp(o.steeringAngle/35,-1,1),1];
 }
 function dot(w,x){let s=0;for(let i=0;i<x.length;i++)s+=(w[i]||0)*x[i];return s}
+function learnedPolicyEnabled(){return localStorage.getItem(POLICY_KEY)!=='classic'}
 
 export class BehaviorCloningAlign{
   constructor(){this.model=this.load()}
   load(){try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch{return null}}
   save(model){localStorage.setItem(KEY,JSON.stringify(model));this.model=model;return model}
   clear(){localStorage.removeItem(KEY);this.model=null}
-  isReady(){return !!this.model?.speedW?.length&&!!this.model?.steerW?.length}
+  isReady(){return learnedPolicyEnabled()&&!!this.model?.speedW?.length&&!!this.model?.steerW?.length}
   predict(obs){
     if(!this.isReady())return null;
     const x=features(obs),speedN=Math.tanh(dot(this.model.speedW,x)),steerN=Math.tanh(dot(this.model.steerW,x));
