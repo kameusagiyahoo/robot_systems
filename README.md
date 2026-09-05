@@ -18,12 +18,15 @@
 - Classic vs Learned comparison
 - seeded benchmark / evaluation history
 - Episode logging and JSON/CSV export
-- plugin-based **Skill Learning Framework v2.5**
+- plugin-based **Skill Learning Framework v2.6**
 - cancellable Web Worker training + timeout
-- Dataset Adapter with synthetic/manual workflows
 - Skill-specific Demonstration Recorder Adapter
-- long-press manual driving → observation/action dataset
+- 1 recording session = 1 Demonstration Episode
+- Episode Outcome / Quality / Note labels
+- Episode-level Train / Validation split
+- Train + Validation loss visualization
 - deterministic Model ID + checksum
+- Model-aware closed-loop Rollout Evaluation
 - Skill Learning Package import/export + integrity check
 - LeRobot conversion用 intermediate JSON export
 - Plugin/Policy/Model/Dataset/Recorder metadata in Episode logs
@@ -53,9 +56,7 @@ Observation / Result
 
 ## Skill Learning Framework
 
-学習方式を全Skillで統一しません。
-
-共通化するのは枠組みだけです。
+学習方式を全Skillで統一しません。共通化するのは枠組みだけです。
 
 ```text
 Skill
@@ -72,7 +73,7 @@ SkillごとにDataset、Demonstration Recording、Algorithm、Training Backend�
 
 現在の例:
 
-- Motion Skills → Behavior Cloning plugin + Motion Dataset Adapter + Manual Demo Recorder + Web Worker Training + Motion BC Runtime
+- Motion Skills → Behavior Cloning plugin + episodic Motion Dataset + Manual Demo Recorder + Web Worker Training + Motion BC Runtime
 - DetectPallet → future Perception plugin
 - Insert/Lift/Place → future Manipulation plugin
 
@@ -86,6 +87,8 @@ src/learning/framework/
   plugin_registry.js
   dataset_adapter.js
   demonstration_recorder_adapter.js
+  demonstration_episode_store.js
+  dataset_split.js
   training_backend.js
   runtime_policy_adapter.js
   runtime_router.js
@@ -124,34 +127,40 @@ Skill Plugin
   ↓
 Demonstration Recorder Adapter
   ↓
-Observation + Action
+Demonstration Episode
+  ├ Outcome
+  ├ Quality
+  ├ Note
+  └ Observation + Action samples
   ↓
 Dataset Adapter
-  ↓
-Manual / Recorded Dataset
 ```
 
 現在は `NavigateToPallet / AlignToPallet / Transport / Retreat` を手動記録できます。
 
-研究設定のRecorderでSkillを選び、記録開始後に方向ボタンを長押しすると、約80ms周期で操作サンプルを記録します。
+研究設定のRecorderでSkillを選び、記録開始後に方向ボタンを長押しします。1回の開始〜停止が1 Episodeです。保存後、Skill学習画面でOutcome / Quality / Noteを編集できます。
 
-### Training route
+### Train / Validation route
 
 ```text
-Learning UI
+Recorded Episodes
   ↓
-Skill Plugin
+Demo Filter
   ↓
-Dataset Adapter
+Episode-level split
+  ├ Train Episodes
+  └ Validation Episodes
   ↓
 Training Backend
-  ↓
-Web Worker
   ↓
 Model ID + checksum
 ```
 
-Motion BCはWeb Workerで学習します。学習中はキャンセル可能で、Pluginが公開したtimeoutを超えるとWorkerを停止します。cancel / timeout時にはmain-thread fallbackしません。
+手動Demonstrationでは、同一走行の連続フレームがTrainとValidationの両方へ入らないようEpisode単位で分離します。Synthetic/legacy flat Datasetだけsample-level deterministic splitを使います。
+
+Motion BCはTrain lossとValidation lossを保存し、学習画面で両方を可視化します。
+
+**Validation lossはDataset上の予測誤差であり、閉ループSkill成功率ではありません。** 実際の実行性能はRollout Evaluationで確認します。
 
 ### Runtime route
 
@@ -174,24 +183,23 @@ state.emit
 
 `RulePolicy` はClassic制御だけを担当し、BC/ACT/SAC等の学習方式固有Runtimeを直接持たない方針です。
 
-### Evaluation route
+### Model-aware Rollout Evaluation
 
 ```text
 Skill Evaluation UI
   ↓
-Learning Plugin
-  ↓
-Skill Evaluator
-  ↓
 Evaluation Scenario Adapter
-  ├ create runtime
-  ├ prepare trial
-  ├ execute skill
-  ├ measure trial
-  └ aggregate metrics
+  ↓
+closed-loop trials
+  ↓
+Evaluation result
+  ├ Model ID
+  ├ Model checksum
+  ├ Success rate
+  └ Skill-specific metrics
 ```
 
-`skill_evaluator.js` はSkill固有の初期条件生成を持たず、Scenario Adapterへ委譲します。
+再学習してModel IDが変わった場合、以前のLearned評価を現在Modelの評価として表示しません。
 
 ### Skill Learning Package
 
@@ -203,7 +211,7 @@ Packageには以下を含みます。
 - selected Policy
 - Model + Model checksum
 - Dataset metadata
-- manual/recorded Dataset payload（該当時）
+- episodic/manual Dataset payload
 - Evaluation history
 - Package checksum
 
@@ -214,9 +222,9 @@ Import時にPackage checksumとModel checksumを検証します。
 現在のMotion Dataset Adapterは以下を扱います。
 
 - synthetic expert
-- recorded manual demonstration
+- recorded Demonstration Episodes
 - imported observation/action JSON
-- portable skill dataset JSON
+- portable episodic skill dataset JSON
 - LeRobot conversion用 intermediate JSON
 
 LeRobot intermediate JSONは公式LeRobotDatasetそのものではありません。PC/Workstation側で公式形式へ変換するための中間形式です。
