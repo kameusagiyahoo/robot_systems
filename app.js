@@ -16,31 +16,38 @@ let running=false;
 
 function log(type,msg){const d=document.createElement('div');d.className=`log-line ${type}`;const t=new Date().toLocaleTimeString();d.innerHTML=`<span class="time">${t}</span> ${msg}`;$('#log').appendChild(d);$('#log').scrollTop=$('#log').scrollHeight}
 
-function render(s){renderer.draw(s);$('#robotState').textContent=JSON.stringify(s.robot,null,2);$('#agentState').textContent=JSON.stringify({task:s.task,agent:s.agent,perception:s.perception},null,2);renderHistory(s)}
+function render(s){renderer.draw(s);$('#robotState').textContent=JSON.stringify(s.robot,null,2);$('#agentState').textContent=JSON.stringify({task:s.task,agent:s.agent,perception:s.perception,failures:s.failures,obstacle:s.obstacle.enabled},null,2);renderHistory(s);syncFailureControls(s)}
 
 function renderHistory(s){const q=$('#skillQueue');q.innerHTML='';if(!s.agent.history.length){q.innerHTML='<div class="hint">No decisions yet.</div>';return;}s.agent.history.slice().reverse().forEach((h,i)=>{const e=document.createElement('div');e.className='skill-item '+(i===0?'current':'done');e.innerHTML=`<span>#${h.step} ${h.skill}</span><code>${JSON.stringify(h.result)}</code>`;q.appendChild(e)})}
+
+function syncFailureControls(s){$('#obstacleToggle').checked=s.obstacle.enabled;$('#detectFailToggle').checked=s.failures.forceDetectionFailure;$('#alignFailToggle').checked=s.failures.forceAlignmentFailure;$('#insertFailToggle').checked=s.failures.forceInsertionFailure}
 
 store.subscribe(render);
 
 async function makePlan(){
   const text=$('#taskInput').value.trim();
-  if(!text){log('error','Task is empty');return;}
+  if(!text){log('error','Task is empty');return false;}
   store.state.task=await planner.createTask(text);
   store.state.agent.currentSkill=null;
   store.state.agent.lastResult=null;
-  store.state.agent.status='ready';
+  store.state.agent.status=store.state.task.status==='invalid'?'invalid':'ready';
   store.state.agent.stepCount=0;
   store.state.agent.history=[];
   store.state.agent.memory.retreated=false;
   store.state.perception.detectedPallets=[];
   store.emit();
+  if(store.state.task.status==='invalid'){
+    log('error',`Task parse failed → supported examples: "パレットAを出荷エリアへ運んで", "パレットBを棚1へ"`);
+    return false;
+  }
   log('planner',`Task parsed → source=${store.state.task.source}, destination=${store.state.task.destination}`);
+  return true;
 }
 
 async function step(){
   const s=store.state;
-  if(!s.task.raw || s.task.status==='idle'){await makePlan();}
-  if(s.task.status==='done' || s.task.status==='failed') return false;
+  if(!s.task.raw || s.task.status==='idle'){const ok=await makePlan();if(!ok)return false;}
+  if(s.task.status==='done' || s.task.status==='failed' || s.task.status==='invalid') return false;
 
   const decision=await planner.next(s.task,s);
   if(decision.type==='done'){
@@ -66,13 +73,20 @@ async function step(){
   return result.ok;
 }
 
-async function run(){if(running)return;running=true;while(running){const keep=await step();if(!keep||store.state.task.status==='done'||store.state.task.status==='failed')break;await new Promise(r=>setTimeout(r,450))}running=false}
+async function run(){if(running)return;running=true;while(running){const keep=await step();if(!keep||['done','failed','invalid'].includes(store.state.task.status))break;await new Promise(r=>setTimeout(r,450))}running=false}
+
+function setFailure(path,value,label){if(path==='obstacle')store.state.obstacle.enabled=value;else store.state.failures[path]=value;store.emit();log('planner',`${label}: ${value?'ON':'OFF'}`)}
 
 $('#planBtn').onclick=makePlan;
 $('#stepBtn').onclick=step;
 $('#runBtn').onclick=run;
 $('#resetBtn').onclick=()=>{running=false;store.reset();log('planner','System reset')};
 $('#clearLogBtn').onclick=()=>$('#log').innerHTML='';
+$('#obstacleToggle').onchange=e=>setFailure('obstacle',e.target.checked,'Obstacle');
+$('#detectFailToggle').onchange=e=>setFailure('forceDetectionFailure',e.target.checked,'Detection failure');
+$('#alignFailToggle').onchange=e=>setFailure('forceAlignmentFailure',e.target.checked,'Alignment failure');
+$('#insertFailToggle').onchange=e=>setFailure('forceInsertionFailure',e.target.checked,'Insertion failure');
+
 document.querySelectorAll('[data-manual]').forEach(b=>b.onclick=()=>{const a=b.dataset.manual;if(a==='forward')robot.sendAction({type:'move',dx:0,dy:-18});if(a==='back')robot.sendAction({type:'move',dx:0,dy:18});if(a==='left')robot.sendAction({type:'move',dx:-18,dy:0});if(a==='right')robot.sendAction({type:'move',dx:18,dy:0});if(a==='lift')robot.sendAction({type:'fork',raised:!store.state.robot.forkRaised})});
 
-log('planner','Ready: v0.5 state-driven Agent loop / Rule Planner / SimRobot');
+log('planner','Ready: v0.6 state-driven Agent loop + failure laboratory');
