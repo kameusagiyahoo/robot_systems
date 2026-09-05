@@ -210,12 +210,26 @@
 - [x] Package checksum validation
 - [x] Model checksum validation on Package import
 - [x] restore Model / Dataset / Policy / Evaluation history from Package
+
+### v2.6 — Episodic demonstrations / validation / model-aware rollout
+- [x] 1 recording session = 1 Demonstration Episode
+- [x] generic local Demonstration Episode Store
+- [x] Outcome labels: success / failure / unlabeled
+- [x] Quality labels: good / ok / bad / unrated
+- [x] editable Episode note and deletion UI
+- [x] Demo Filter: all / success only / good-or-ok
+- [x] deterministic Dataset Split utility
+- [x] Episode-level Train / Validation split for episodic demonstrations
+- [x] sample-level split fallback for synthetic / legacy flat datasets
+- [x] Train loss + Validation loss
+- [x] Train / Validation loss visualization
+- [x] split metadata in Model / Dataset / Episode logs
+- [x] Learned rollout evaluation linked to current Model ID/checksum
+- [x] stale evaluation from an older Model ID is not shown as current-model result
 - [ ] official LeRobotDataset converter / importer
-- [ ] demonstration episode boundaries / quality labels
 - [ ] DAgger / corrective demonstration workflow
 - [ ] plugin-local visualization registration
-- [ ] train / validation dataset split
-- [ ] rollout benchmark linked to Model ID
+- [ ] benchmark difficulty sets (easy / medium / hard)
 
 ## Phase 1 — Cloudflare + OpenAI Planner
 - [ ] Move deployment from GitHub Pages to Cloudflare Pages
@@ -311,4 +325,5 @@ Evaluation:
 3. `RobotInterface` stays stable so SimRobot → PiRobot → ForkliftRobot is a replaceable adapter.
 4. Every episode is recorded as observation/state/action/result data.
 5. Skill Learning Framework自体は学習方式を固定せず、Dataset / Demonstration Recording / Algorithm / Training Backend / Runtime / Evaluation / VisualizationをPluginで差し替える。
-6. LeRobot, VLA, World Model, etc. are introduced only when the corresponding research question exists.
+6. Train/ValidationはDataset上の汎化確認、Rollout Evaluationは閉ループ実行性能として区別する。
+7. LeRobot, VLA, World Model, etc. are introduced only when the corresponding research question exists.
