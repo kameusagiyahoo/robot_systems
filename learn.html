@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>Skill Learning Framework v2.2</title>
+  <title>Skill Learning Framework v2.3</title>
   <link rel="stylesheet" href="./style.css">
   <link rel="stylesheet" href="./learning_framework.css">
 </head>
 <body>
 <div class="learn-screen">
-  <header class="learn-top"><div><strong>Skill Learning Framework</strong> <span>v2.2</span></div><a class="back-link" href="./index.html">← Task</a></header>
+  <header class="learn-top"><div><strong>Skill Learning Framework</strong> <span>v2.3</span></div><a class="back-link" href="./index.html">← Task</a></header>
   <main class="learn-main">
     <section class="skill-focus"><div><small>Task Pipeline / Skill</small><h1 id="skillTitle">読み込み中...</h1><p id="skillDesc"></p></div><div id="skillNumber" class="skill-number">- / 8</div></section>
     <section class="learn-status"><div id="learnIndicator" class="learn-indicator">－</div><div><h2 id="learnTitle">確認中...</h2><p id="learnMessage"></p><div id="trainingNote" class="training-note hidden">学習中...</div></div></section>
@@ -17,6 +17,8 @@
       <div class="learning-item"><span>Learning Plugin</span><strong id="pluginState">-</strong></div>
       <div class="learning-item"><span>Runtime Adapter</span><strong id="runtimeAdapterState">-</strong></div>
       <div class="learning-item"><span>Evaluation Scenario</span><strong id="scenarioAdapterState">-</strong></div>
+      <div class="learning-item"><span>Training Backend</span><strong id="trainingBackendState">-</strong></div>
+      <div class="learning-item"><span>Dataset Adapter</span><strong id="datasetAdapterState">-</strong></div>
       <div class="learning-item"><span>Policy</span><strong id="policyState">-</strong><div id="policyButtons" class="policy-buttons"></div></div>
       <div class="learning-item"><span>Algorithm</span><strong id="algorithmState">-</strong></div>
       <div class="learning-item"><span>Dataset Schema</span><strong id="datasetSchema">-</strong></div>
@@ -25,6 +27,7 @@
       <div class="learning-item"><span>Training</span><strong id="trainingState">-</strong></div>
       <div class="learning-item"><span>Evaluation</span><strong id="evaluationState">未実施</strong></div>
       <div class="learning-item full"><span>Training Parameters</span><div id="trainingParameters" class="plugin-parameters"></div></div>
+      <div id="datasetToolsCard" class="learning-item full"><span>Dataset Tools</span><div class="dataset-tools"><input id="datasetImportInput" type="file" accept="application/json,.json" hidden><button id="datasetImportBtn">JSON Import</button><button id="datasetExportBtn">Portable JSON</button><button id="lerobotExportBtn">LeRobot中間JSON</button></div><p id="datasetToolState" class="learning-note"></p></div>
       <div class="learning-item full"><span>Visualization Adapter</span><div id="visualizationHost" class="plugin-viz-host"></div></div>
       <div class="learning-item full"><span>このSkill / Pluginについて</span><p id="skillNote" class="learning-note"></p></div>
     </section>
