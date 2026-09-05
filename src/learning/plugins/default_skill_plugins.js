@@ -1,37 +1,31 @@
 import {SkillLearningPlugin,DescriptorOnlyLearningPlugin} from '../framework/skill_learning_plugin.js';
 import {registerLearningPlugin} from '../framework/plugin_registry.js';
-import {BehaviorCloningSkill,generateSkillDemos} from '../behavior_cloning_skill.js';
-import {BehaviorCloningAlign,generateSyntheticDemos} from '../behavior_cloning_align.js';
 import {saveDatasetMeta,saveSkillModel} from '../skill_learning_registry.js';
 import {MotionBehaviorCloningRuntimeAdapter} from './motion_bc_runtime.js';
 import {motionScenarioAdapter,perceptionScenarioAdapter,manipulationScenarioAdapter} from './forklift_evaluation_scenarios.js';
+import {MotionDatasetAdapter} from './motion_dataset_adapter.js';
+import {MotionBcTrainingBackend} from './motion_bc_training_backend.js';
 
 const MOTION_SKILLS=['navigate_to_pallet','align_to_pallet','navigate_to','retreat'];
 const metric=(key,label,format='number',unit='',extra={})=>({key,label,format,unit,...extra});
 const successMetric=()=>metric('successRate','成功率','percent','',{primary:true,better:'higher',goodThreshold:.8});
 const motionRuntimeAdapter=new MotionBehaviorCloningRuntimeAdapter();
-
-function datasetSummary(samples){
-  const keys=['dx','dy','yawError','speed','steeringAngle'],features={};
-  for(const key of keys){
-    const values=samples.map(s=>Number(s.obs?.[key])).filter(Number.isFinite);
-    if(!values.length)continue;
-    features[key]={min:Math.min(...values),max:Math.max(...values),mean:values.reduce((a,b)=>a+b,0)/values.length};
-  }
-  const step=Math.max(1,Math.floor(samples.length/120)),preview=[];
-  for(let i=0;i<samples.length&&preview.length<120;i+=step){const o=samples[i].obs;preview.push({dx:o.dx,dy:o.dy,yawError:o.yawError})}
-  return{features,preview};
-}
+const motionDatasetAdapter=new MotionDatasetAdapter();
+const motionTrainingBackend=new MotionBcTrainingBackend();
 
 class MotionBehaviorCloningPlugin extends SkillLearningPlugin{
-  constructor(){super({id:'motion_bc',label:'Motion Behavior Cloning',version:2})}
+  constructor(){super({id:'motion_bc',label:'Motion Behavior Cloning',version:3})}
   supports(skillId){return MOTION_SKILLS.includes(skillId)}
   getCapabilities(){return{trainable:true,evaluable:true,runtimeLearning:true,policies:['classic','learned']}}
   getAlgorithms(){return[{id:'behavior_cloning',label:'Behavior Cloning',kind:'imitation'}]}
-  getDatasetSchema(skillId){return{type:'observation_action',skillId,observation:['dx','dy','yawError','speed','steeringAngle'],action:['speed','steeringAngle'],generator:'synthetic_expert'}}
+  getDatasetSchema(skillId){return{type:'observation_action',skillId,observation:['dx','dy','yawError','speed','steeringAngle'],action:['speed','steeringAngle']}}
+  getDatasetAdapter(){return motionDatasetAdapter}
+  getTrainingBackend(){return motionTrainingBackend}
   getTrainingParameters(){return[
+    {key:'datasetSource',label:'Dataset',type:'select',default:'synthetic_expert',options:[['synthetic_expert','Synthetic Expert'],['manual_import','Manual / Imported Demo']]},
     {key:'samples',label:'Samples',type:'number',default:2500,min:200,max:10000,step:100},
-    {key:'seed',label:'Seed',type:'number',default:42,step:1}
+    {key:'seed',label:'Seed',type:'number',default:42,step:1},
+    {key:'epochs',label:'Epochs',type:'number',default:700,min:50,max:2000,step:50}
   ]}
   getEvaluationParameters(){return[
     {key:'trials',label:'Trials',type:'number',default:20,min:1,max:100,step:1},
@@ -51,27 +45,21 @@ class MotionBehaviorCloningPlugin extends SkillLearningPlugin{
   ]}
   getRuntimePolicyAdapter(){return motionRuntimeAdapter}
   getEvaluationScenarioAdapter(){return motionScenarioAdapter}
-  getNote(skillId){return`${skillId} 用の連続制御学習Plugin。Dataset / Training / Runtime / Evaluation Scenario / VisualizationをPlugin側で定義します。`}
-  async train(skillId,{samples=2500,seed=42,onProgress=null}={}){
+  getNote(skillId){return`${skillId} 用の連続制御学習Plugin。Dataset / Training Backend / Runtime / Evaluation Scenario / VisualizationをPlugin側で定義します。`}
+  async train(skillId,{datasetSource='synthetic_expert',samples=2500,seed=42,epochs=null,onProgress=null}={}){
     if(!this.supports(skillId))throw new Error(`unsupported_skill_for_plugin:${skillId}`);
-    const count=Math.max(200,Math.min(10000,Number(samples)||2500)),fixedSeed=Number(seed)||42;
-    onProgress?.({phase:'dataset',label:'教師データ生成中'});
-    const demos=skillId==='align_to_pallet'?generateSyntheticDemos(count,fixedSeed):generateSkillDemos(skillId,count,fixedSeed);
-    const summary=datasetSummary(demos);
-    const dataset=saveDatasetMeta(skillId,{kind:'synthetic_expert',samples:demos.length,seed:fixedSeed,generatedAt:new Date().toISOString(),pluginId:this.id,algorithm:'behavior_cloning',featureSummary:summary.features,preview:summary.preview});
-    onProgress?.({phase:'training',label:'Behavior Cloning 学習中',progress:0});
-    let model;
-    const onEpoch=(point,meta)=>onProgress?.({phase:'training',label:'Behavior Cloning 学習中',progress:point.epoch/meta.epochs,point});
-    if(skillId==='align_to_pallet'){
-      const bc=new BehaviorCloningAlign();model=bc.train(demos,{onEpoch});model=saveSkillModel(skillId,{...model,algorithm:'behavior_cloning',pluginId:this.id});
-    }else{const bc=new BehaviorCloningSkill(skillId);model=bc.train(demos,{onEpoch});model=saveSkillModel(skillId,{...model,pluginId:this.id})}
+    const datasetRequest=await motionDatasetAdapter.buildTrainingDataset(skillId,{source:datasetSource,samples,seed});
+    onProgress?.({phase:'backend',label:'Web Workerを起動中',progress:0});
+    const trained=await motionTrainingBackend.train(skillId,{samples:datasetRequest.requestedSamples,seed:datasetRequest.seed,epochs,datasetSamples:datasetRequest.samples,onProgress});
+    const model=saveSkillModel(skillId,{...trained.model,pluginId:this.id,trainingBackendId:trained.backend?.id||motionTrainingBackend.id,trainingBackendVersion:trained.backend?.version||motionTrainingBackend.version,datasetSource});
+    const dataset=saveDatasetMeta(skillId,{kind:datasetSource,samples:trained.dataset.samples,seed:datasetRequest.seed,generatedAt:new Date().toISOString(),pluginId:this.id,datasetAdapterId:motionDatasetAdapter.id,datasetAdapterVersion:motionDatasetAdapter.version,algorithm:'behavior_cloning',featureSummary:trained.dataset.featureSummary,preview:trained.dataset.preview});
     onProgress?.({phase:'done',label:'学習完了',progress:1});
-    return{model,dataset,pluginId:this.id};
+    return{model,dataset,pluginId:this.id,trainingBackend:trained.backend};
   }
 }
 
 const perceptionPlugin=new DescriptorOnlyLearningPlugin({
-  id:'perception_future',label:'Perception Learning Adapter',version:2,skills:['detect_pallet'],
+  id:'perception_future',label:'Perception Learning Adapter',version:3,skills:['detect_pallet'],
   descriptor:{
     capabilities:{trainable:false,evaluable:true,runtimeLearning:false,policies:['classic']},
     algorithms:[{id:'detector',label:'Detector / Segmentation / VLM',kind:'perception'}],
@@ -86,7 +74,7 @@ const perceptionPlugin=new DescriptorOnlyLearningPlugin({
 });
 
 const manipulationPlugin=new DescriptorOnlyLearningPlugin({
-  id:'manipulation_future',label:'Manipulation Learning Adapter',version:2,skills:['insert_forks','lift','place'],
+  id:'manipulation_future',label:'Manipulation Learning Adapter',version:3,skills:['insert_forks','lift','place'],
   descriptor:{
     capabilities:{trainable:false,evaluable:true,runtimeLearning:false,policies:['classic']},
     algorithms:[{id:'sequence_policy',label:'BC / ACT / Diffusion Policy / RL',kind:'manipulation'}],
