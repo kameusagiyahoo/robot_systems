@@ -1,12 +1,12 @@
 export const SKILL_LEARNING_REGISTRY=[
-  {id:'navigate_to_pallet',order:1,label:'移動',code:'NavigateToPallet',desc:'パレット付近まで移動',group:'motion',defaultPolicy:'Pure Pursuit / PID',learning:'Behavior Cloning / SAC',trainable:true,runtimeLearning:true,note:'長距離経路追従。Classic Controllerと学習済みBC Policyを切り替えて実行・評価できます。'},
-  {id:'detect_pallet',order:2,label:'検出',code:'DetectPallet',desc:'パレットを検出',group:'perception',defaultPolicy:'Rule perception',learning:'Detector / VLM',trainable:false,runtimeLearning:false,note:'画像入力がまだ無いため現シミュレータでは教師データを作れません。Camera導入後に学習対象化。'},
-  {id:'align_to_pallet',order:3,label:'位置合せ',code:'AlignToPallet',desc:'フォーク位置へ精密位置合わせ',group:'motion',defaultPolicy:'Rule staged docking',learning:'Behavior Cloning / SAC',trainable:true,runtimeLearning:true,note:'精密位置合わせ。Classic staged dockingと学習済みBC Policyを切り替えて実行・評価できます。'},
-  {id:'insert_forks',order:4,label:'差込み',code:'InsertForks',desc:'フォークを差し込む',group:'manipulation',defaultPolicy:'Rule',learning:'BC / ACT',trainable:false,runtimeLearning:false,note:'現在のSimulatorでは差込みが瞬時状態遷移のため学習対象にする物理自由度がありません。'},
-  {id:'lift',order:5,label:'持上げ',code:'Lift',desc:'パレットを持ち上げる',group:'manipulation',defaultPolicy:'Rule',learning:'BC / ACT',trainable:false,runtimeLearning:false,note:'現在はFork ON/OFFの決定論的Skill。高さ・荷重制御を追加後に学習対象化。'},
-  {id:'navigate_to',order:6,label:'搬送',code:'Transport',desc:'目的地まで搬送',group:'motion',defaultPolicy:'Pure Pursuit / PID',learning:'Behavior Cloning / SAC',trainable:true,runtimeLearning:true,note:'搬送経路追従。Classic Controllerと学習済みBC Policyを切り替えて実行・評価できます。'},
-  {id:'place',order:7,label:'設置',code:'Place',desc:'目的地へ設置',group:'manipulation',defaultPolicy:'Rule',learning:'BC / ACT',trainable:false,runtimeLearning:false,note:'現在は瞬時設置。フォーク降下・離脱を物理化した後に学習対象化。'},
-  {id:'retreat',order:8,label:'退避',code:'Retreat',desc:'パレットから離れる',group:'motion',defaultPolicy:'Rule reverse',learning:'Behavior Cloning / SAC',trainable:true,runtimeLearning:true,note:'後退の連続制御。Classic reverseと学習済みBC Policyを切り替えて実行・評価できます。'}
+  {id:'navigate_to_pallet',order:1,label:'移動',code:'NavigateToPallet',desc:'パレット付近まで移動',group:'motion',learningPlugin:'motion_bc',defaultPolicy:'Pure Pursuit / PID',learning:'Behavior Cloning / SAC',trainable:true,runtimeLearning:true,note:'長距離経路追従。Classic Controllerと学習済みBC Policyを切り替えて実行・評価できます。'},
+  {id:'detect_pallet',order:2,label:'検出',code:'DetectPallet',desc:'パレットを検出',group:'perception',learningPlugin:'perception_future',defaultPolicy:'Rule perception',learning:'Detector / VLM',trainable:false,runtimeLearning:false,note:'画像入力がまだ無いため現シミュレータでは教師データを作れません。Camera導入後に学習対象化。'},
+  {id:'align_to_pallet',order:3,label:'位置合せ',code:'AlignToPallet',desc:'フォーク位置へ精密位置合わせ',group:'motion',learningPlugin:'motion_bc',defaultPolicy:'Rule staged docking',learning:'Behavior Cloning / SAC',trainable:true,runtimeLearning:true,note:'精密位置合わせ。Classic staged dockingと学習済みBC Policyを切り替えて実行・評価できます。'},
+  {id:'insert_forks',order:4,label:'差込み',code:'InsertForks',desc:'フォークを差し込む',group:'manipulation',learningPlugin:'manipulation_future',defaultPolicy:'Rule',learning:'BC / ACT',trainable:false,runtimeLearning:false,note:'現在のSimulatorでは差込みが瞬時状態遷移のため学習対象にする物理自由度がありません。'},
+  {id:'lift',order:5,label:'持上げ',code:'Lift',desc:'パレットを持ち上げる',group:'manipulation',learningPlugin:'manipulation_future',defaultPolicy:'Rule',learning:'BC / ACT',trainable:false,runtimeLearning:false,note:'現在はFork ON/OFFの決定論的Skill。高さ・荷重制御を追加後に学習対象化。'},
+  {id:'navigate_to',order:6,label:'搬送',code:'Transport',desc:'目的地まで搬送',group:'motion',learningPlugin:'motion_bc',defaultPolicy:'Pure Pursuit / PID',learning:'Behavior Cloning / SAC',trainable:true,runtimeLearning:true,note:'搬送経路追従。Classic Controllerと学習済みBC Policyを切り替えて実行・評価できます。'},
+  {id:'place',order:7,label:'設置',code:'Place',desc:'目的地へ設置',group:'manipulation',learningPlugin:'manipulation_future',defaultPolicy:'Rule',learning:'BC / ACT',trainable:false,runtimeLearning:false,note:'現在は瞬時設置。フォーク降下・離脱を物理化した後に学習対象化。'},
+  {id:'retreat',order:8,label:'退避',code:'Retreat',desc:'パレットから離れる',group:'motion',learningPlugin:'motion_bc',defaultPolicy:'Rule reverse',learning:'Behavior Cloning / SAC',trainable:true,runtimeLearning:true,note:'後退の連続制御。Classic reverseと学習済みBC Policyを切り替えて実行・評価できます。'}
 ];
 
 const MODEL_PREFIX='forklift_skill_model_v1:';
@@ -64,6 +64,6 @@ export function selectedPolicy(id){
 export function setSelectedPolicy(id,policy){localStorage.setItem(policyKey(id),policy)}
 export function skillLearningState(id){
   const def=getSkillDefinition(id),model=loadSkillModel(id),dataset=loadDatasetMeta(id),policy=selectedPolicy(id),evaluation=loadSkillEvaluation(id),evaluationHistory=loadSkillEvaluationHistory(id);
-  return{definition:def,model,dataset,policy,evaluation,evaluationHistory,trained:!!model,trainable:!!def?.trainable,runtimeLearning:!!def?.runtimeLearning};
+  return{definition:def,model,dataset,policy,evaluation,evaluationHistory,trained:!!model,trainable:!!def?.trainable,runtimeLearning:!!def?.runtimeLearning,learningPlugin:def?.learningPlugin||null};
 }
 export function learningSummary(){return SKILL_LEARNING_REGISTRY.map(s=>skillLearningState(s.id))}
