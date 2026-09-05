@@ -75,6 +75,7 @@
 - [x] trajectory distance metric
 - [x] elapsed time metric
 - [x] control tick count
+- [x] collision count
 - [ ] deterministic random seed
 - [ ] batch evaluation runner
 
@@ -82,15 +83,26 @@
 - [x] linear velocity state
 - [x] angular velocity state
 - [x] simulation Δt
-- [x] velocity-based Robot action
+- [x] continuous Robot action
 - [x] closed-loop drive-to-target controller
 - [x] continuous navigation to pallet / destination
 - [x] continuous pallet alignment
 - [x] continuous retreat / recovery motion
 - [x] motion timeout result
-- [ ] bicycle / forklift steering geometry
-- [ ] acceleration and steering-rate limits
-- [ ] collision geometry during every control tick
+
+### v1.1 — Forklift vehicle kinematics
+- [x] rear-wheel-steer bicycle model
+- [x] wheelbase parameter
+- [x] steering-angle state
+- [x] acceleration limit
+- [x] steering-angle limit
+- [x] steering-rate limit
+- [x] collision geometry checked every control tick
+- [x] collision count in Episode metrics
+- [x] RulePolicy commands speed + steering angle instead of yaw rate directly
+- [ ] oriented rectangle vehicle collision model
+- [ ] reverse-aware path controller
+- [ ] path/waypoint representation
 
 ## Phase 1 — Cloudflare + OpenAI Planner
 - [ ] Move deployment from GitHub Pages to Cloudflare Pages
