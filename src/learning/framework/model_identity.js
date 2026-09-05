@@ -1,6 +1,7 @@
+const IDENTITY_IGNORED_KEYS=new Set(['modelId','checksum','identityAlgorithm','importedFromPackageAt','packageChecksum']);
 function stable(value){
   if(Array.isArray(value))return value.map(stable);
-  if(value&&typeof value==='object')return Object.fromEntries(Object.keys(value).sort().filter(k=>!['modelId','checksum','identityAlgorithm'].includes(k)).map(k=>[k,stable(value[k])]));
+  if(value&&typeof value==='object')return Object.fromEntries(Object.keys(value).sort().filter(k=>!IDENTITY_IGNORED_KEYS.has(k)).map(k=>[k,stable(value[k])]));
   return value;
 }
 function stableJson(value){return JSON.stringify(stable(value))}
@@ -18,8 +19,8 @@ export async function checksumValue(value){
 
 export async function identifySkillModel(skillId,model){
   if(!model)throw new Error('model_required_for_identity');
-  const {checksum,algorithm}=await checksumValue(model),algo=model.algorithm||'model';
-  return{...model,modelId:`${skillId}:${algo}:${checksum.slice(0,12)}`,checksum,identityAlgorithm:algorithm};
+  const payload={...model,skillId},algo=payload.algorithm||'model',identity=await checksumValue(payload);
+  return{...payload,modelId:`${skillId}:${algo}:${identity.checksum.slice(0,12)}`,checksum:identity.checksum,identityAlgorithm:identity.algorithm};
 }
 
 export async function verifySkillModelIdentity(model){
