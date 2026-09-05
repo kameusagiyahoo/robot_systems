@@ -57,11 +57,14 @@ function renderComparison(){
 
 function render(){
   const state=skillLearningState(skillId),opts=collectEvaluationOptions(),controller=opts.controller||null,e=latestEvaluationForPolicy(skillId,state.policy,controller)||latestEvaluationForPolicy(skillId,state.policy)||loadSkillEvaluation(skillId);
-  $('#skillTitle').textContent=`${def.code} / ${def.label}`;$('#skillDesc').textContent=def.desc;$('#skillNumber').textContent=`${def.order} / ${SKILL_LEARNING_REGISTRY.length}`;$('#pluginState').textContent=`${descriptor.pluginLabel} v${descriptor.pluginVersion}`;$('#policyState').textContent=state.policy==='learned'?'Learned':'Classic';$('#learnLink').href=`./learn.html?skill=${encodeURIComponent(skillId)}`;
+  $('#skillTitle').textContent=`${def.code} / ${def.label}`;$('#skillDesc').textContent=def.desc;$('#skillNumber').textContent=`${def.order} / ${SKILL_LEARNING_REGISTRY.length}`;
+  $('#pluginState').textContent=`${descriptor.pluginLabel} v${descriptor.pluginVersion}`;
+  $('#scenarioAdapterState').textContent=descriptor.evaluationScenarioAdapter?`${descriptor.evaluationScenarioAdapter.label} v${descriptor.evaluationScenarioAdapter.version}`:'未定義';
+  $('#policyState').textContent=state.policy==='learned'?'Learned':'Classic';$('#learnLink').href=`./learn.html?skill=${encodeURIComponent(skillId)}`;
   const ring=$('#scoreRing'),good=goodPrimary(e);ring.className='score-ring';
-  if(!e){ring.textContent='－';$('#scoreTitle').textContent='未評価';$('#scoreMessage').textContent='このPluginが定義した指標でSkill単体を評価します。'}
+  if(!e){ring.textContent='－';$('#scoreTitle').textContent='未評価';$('#scoreMessage').textContent='このPluginが定義したScenarioと指標でSkill単体を評価します。'}
   else{ring.textContent=formatMetric(primaryMetric,e[primaryMetric?.key]);if(good!==null)ring.classList.add(good?'good':'bad');$('#scoreTitle').textContent=primaryMetric?.label||'評価結果';$('#scoreMessage').textContent=`${e.policy} · ${e.trials} trials / ${String(e.evaluatedAt||'').replace('T',' ').slice(0,16)}`}
-  renderMetricCards(e);$('#evalNote').textContent=`Primary: ${primaryMetric?.label||'-'} / Metrics: ${(descriptor.evaluationMetrics||[]).map(m=>m.label).join(' / ')}`;$('#compareBtn').disabled=!(descriptor.capabilities.runtimeLearning&&state.trained);renderComparison();
+  renderMetricCards(e);$('#evalNote').textContent=`Scenario: ${descriptor.evaluationScenarioAdapter?.label||'-'} / Primary: ${primaryMetric?.label||'-'} / Metrics: ${(descriptor.evaluationMetrics||[]).map(m=>m.label).join(' / ')}`;$('#compareBtn').disabled=!(descriptor.capabilities.runtimeLearning&&state.trained);renderComparison();
 }
 
 async function runEvaluation(labelPrefix=''){
