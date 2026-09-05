@@ -1,1 +1,22 @@
-const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);export class SkillExecutor{constructor(store,robot){this.store=store;this.robot=robot}async execute(step){const fn=this[step.name];if(!fn)return{ok:false,reason:`unknown_skill:${step.name}`};return fn.call(this,step.args||{})}navigate_to_pallet({palletId}){const s=this.store.state,p=s.pallets[palletId];if(!p)return{ok:false,reason:'pallet_not_found'};this.robot.sendAction({type:'teleport',x:p.x-105,y:p.y});return{ok:true,message:`approached ${p.label}`}}detect_pallet({palletId}){const s=this.store.state,p=s.pallets[palletId];if(!p)return{ok:false,reason:'pallet_not_found'};const d=distance(s.robot,p);return d<180?{ok:true,message:`${p.label} detected (${d.toFixed(0)} px)`}:{ok:false,reason:'pallet_not_visible'}}align_to_pallet({palletId}){const s=this.store.state,p=s.pallets[palletId];if(!p)return{ok:false,reason:'pallet_not_found'};this.robot.sendAction({type:'teleport',x:p.x-82,y:p.y});s.robot.aligned=true;this.store.emit();return{ok:true,message:'aligned to pallet (rule-based placeholder)'}}insert_forks({palletId}){const s=this.store.state;if(!s.robot.aligned)return{ok:false,reason:'not_aligned'};s.robot.carrying=palletId;s.pallets[palletId].status='on_forks';this.store.emit();return{ok:true,message:'forks inserted'}}lift(){const s=this.store.state;if(!s.robot.carrying)return{ok:false,reason:'no_load'};this.robot.sendAction({type:'fork',raised:true});return{ok:true,message:'pallet lifted'}}navigate_to({locationId}){const s=this.store.state,l=s.locations[locationId];if(!l)return{ok:false,reason:'location_not_found'};this.robot.sendAction({type:'teleport',x:l.x-75,y:l.y});return{ok:true,message:`navigated to ${l.label}`}}place({locationId}){const s=this.store.state,l=s.locations[locationId],id=s.robot.carrying;if(!id)return{ok:false,reason:'no_load'};s.pallets[id].x=l.x;s.pallets[id].y=l.y;s.pallets[id].status='placed';s.robot.carrying=null;s.robot.forkRaised=false;s.robot.aligned=false;this.store.emit();return{ok:true,message:`placed at ${l.label}`}}retreat(){this.robot.sendAction({type:'move',dx:-70,dy:0});return{ok:true,message:'retreated'}}}
+const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+
+export class SkillExecutor{
+  constructor(store,robot){this.store=store;this.robot=robot}
+  async execute(step){const fn=this[step.name];if(!fn)return{ok:false,reason:`unknown_skill:${step.name}`};return fn.call(this,step.args||{})}
+
+  navigate_to_pallet({palletId}){const s=this.store.state,p=s.pallets[palletId];if(!p)return{ok:false,reason:'pallet_not_found'};this.robot.sendAction({type:'teleport',x:p.x-105,y:p.y});return{ok:true,message:`approached ${p.label}`}}
+
+  detect_pallet({palletId}){const s=this.store.state,p=s.pallets[palletId];if(!p)return{ok:false,reason:'pallet_not_found'};const d=distance(s.robot,p);if(d>=180)return{ok:false,reason:'pallet_not_visible'};if(!s.perception.detectedPallets.includes(palletId))s.perception.detectedPallets.push(palletId);this.store.emit();return{ok:true,message:`${p.label} detected (${d.toFixed(0)} px)`}}
+
+  align_to_pallet({palletId}){const s=this.store.state,p=s.pallets[palletId];if(!p)return{ok:false,reason:'pallet_not_found'};if(!s.perception.detectedPallets.includes(palletId))return{ok:false,reason:'pallet_not_detected'};this.robot.sendAction({type:'teleport',x:p.x-82,y:p.y});s.robot.aligned=true;this.store.emit();return{ok:true,message:'aligned to pallet (rule-based placeholder)'}}
+
+  insert_forks({palletId}){const s=this.store.state;if(!s.robot.aligned)return{ok:false,reason:'not_aligned'};s.robot.carrying=palletId;s.pallets[palletId].status='on_forks';this.store.emit();return{ok:true,message:'forks inserted'}}
+
+  lift(){const s=this.store.state;if(!s.robot.carrying)return{ok:false,reason:'no_load'};this.robot.sendAction({type:'fork',raised:true});return{ok:true,message:'pallet lifted'}}
+
+  navigate_to({locationId}){const s=this.store.state,l=s.locations[locationId];if(!l)return{ok:false,reason:'location_not_found'};this.robot.sendAction({type:'teleport',x:l.x-75,y:l.y});return{ok:true,message:`navigated to ${l.label}`}}
+
+  place({locationId}){const s=this.store.state,l=s.locations[locationId],id=s.robot.carrying;if(!id)return{ok:false,reason:'no_load'};s.pallets[id].x=l.x;s.pallets[id].y=l.y;s.pallets[id].status='placed';s.robot.carrying=null;s.robot.forkRaised=false;s.robot.aligned=false;this.store.emit();return{ok:true,message:`placed at ${l.label}`}}
+
+  retreat(){const s=this.store.state;this.robot.sendAction({type:'move',dx:-70,dy:0});s.agent.memory.retreated=true;this.store.emit();return{ok:true,message:'retreated'}}
+}
