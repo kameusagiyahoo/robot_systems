@@ -19,8 +19,8 @@
 - [x] SimRobot implementation
 - [x] Reusable skill catalog
 - [x] Agent log / state inspector
-- [ ] Explicit Policy interface below Skill layer
-- [ ] Skill preconditions / postconditions
+- [x] Explicit Policy interface below Skill layer
+- [x] Skill preconditions / postconditions
 - [ ] Skill timeout / cancel
 
 ### v0.4 — Rule Planner
@@ -32,7 +32,7 @@
 
 ### v0.5 — Agent loop
 - [x] Observe → Plan → Skill → Result → State
-- [x] Planner chooses one next Skill at a time instead of generating only a fixed full queue
+- [x] Planner chooses one next Skill at a time
 - [x] Structured observation schema
 - [x] Structured action/result schema
 - [x] Decision history in UI
@@ -40,22 +40,42 @@
 
 ### v0.6 — Failure conditions
 - [x] Failure Lab controls in UI
-- [x] Enable obstacle / blocked-path failure
-- [x] pallet not visible / forced detection failure
+- [x] obstacle / blocked-path failure
+- [x] pallet detection failure
 - [x] alignment failure
 - [x] insertion failure
-- [x] blocked path reason
 - [x] invalid task
-- [x] Failed Skill returns a structured reason
+- [x] structured failure reason
 
 ### v0.7 — Replanning
-- [x] Failed Skill returns reason
-- [ ] Planner consumes failure result and state
-- [ ] Retry policy / retry limit
-- [ ] Alternate route around obstacle
-- [ ] Recover after transient perception/alignment failure
-- [ ] Abort when recovery is impossible
+- [x] Planner consumes failure result and state
+- [x] Retry policy / retry limit
+- [x] Alternate route around obstacle
+- [x] Recovery action for perception failure
+- [x] Recovery action for alignment / insertion failure
+- [x] Abort when recovery is impossible
 - [ ] Compare fixed Behavior Tree vs agentic replanning
+
+### v0.8 — Policy separation
+- [x] PolicyInterface
+- [x] RulePolicy
+- [x] Skill → Policy → Robot separation
+- [x] Skill preconditions / postconditions
+- [ ] Continuous kinematic Policy instead of teleport placeholders
+- [ ] PID Policy baseline
+- [ ] MPC Policy baseline
+
+### v0.9 — Episode logging / research data
+- [x] Observation schema
+- [x] Action schema
+- [x] Result schema
+- [x] Observation_t → Action_t → Result_t → Observation_t+1 recording
+- [x] Episode success / failure / recovery metrics
+- [x] Browser JSON export
+- [ ] trajectory distance metric
+- [ ] elapsed time metric
+- [ ] deterministic random seed
+- [ ] batch evaluation runner
 
 ## Phase 1 — Cloudflare + OpenAI Planner
 - [ ] Move deployment from GitHub Pages to Cloudflare Pages
@@ -137,7 +157,7 @@ Evaluation:
 
 ## Phase 6 — Real forklift
 - [ ] ForkliftRobot adapter
-- [ ] preserve Task / Planner / Skill interfaces
+- [ ] preserve Task / Planner / Skill / Policy interfaces
 - [ ] hardware safety controller independent from LLM
 - [ ] emergency stop
 - [ ] speed / steering / fork control limits
@@ -146,7 +166,7 @@ Evaluation:
 
 ## Architectural principles
 1. LLM decides **what Skill to use**, not low-level actuator values.
-2. Precise/safety-critical motion remains in deterministic or validated Skill controllers unless research explicitly tests alternatives.
+2. Precise/safety-critical motion remains in deterministic or validated Policy/Controller unless research explicitly tests alternatives.
 3. `RobotInterface` stays stable so SimRobot → PiRobot → ForkliftRobot is a replaceable adapter.
-4. Every episode should eventually be recordable as observation/state/action/result data.
+4. Every episode is recorded as observation/state/action/result data.
 5. LeRobot, VLA, World Model, etc. are introduced only when the corresponding research question exists.
