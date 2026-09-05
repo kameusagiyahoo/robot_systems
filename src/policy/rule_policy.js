@@ -2,16 +2,202 @@ import {PolicyInterface} from './policy_interface.js';
 import {densifyPath,purePursuitCommand} from '../control/pure_pursuit.js';
 import {PIDPathController} from '../control/pid_path.js';
 import {BehaviorCloningAlign} from '../learning/behavior_cloning_align.js';
-const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);const segmentHitsRect=(a,b,r)=>{const steps=40;for(let i=0;i<=steps;i++){const t=i/steps,x=a.x+(b.x-a.x)*t,y=a.y+(b.y-a.y)*t;if(x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h)return true}return false};const angleWrap=d=>((d+180)%360+360)%360-180;const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));const wait=ms=>new Promise(r=>setTimeout(r,ms));
+import {BehaviorCloningSkill} from '../learning/behavior_cloning_skill.js';
+import {selectedPolicy,loadSkillModel} from '../learning/skill_learning_registry.js';
+
+const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+const segmentHitsRect=(a,b,r)=>{const steps=40;for(let i=0;i<=steps;i++){const t=i/steps,x=a.x+(b.x-a.x)*t,y=a.y+(b.y-a.y)*t;if(x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h)return true}return false};
+const angleWrap=d=>((d+180)%360+360)%360-180;
+const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const deg2rad=d=>d*Math.PI/180;
+
 export class RulePolicy extends PolicyInterface{
- constructor(store,robot){super(store,robot);this.pid=new PIDPathController();this.bcAlign=new BehaviorCloningAlign()}
- async driveTo(target,{tolerance=10,maxTicks=420,allowReverse=true,maxSpeedOverride=null}={}){const s=this.store.state;for(let i=0;i<maxTicks;i++){const r=s.robot,dx=target.x-r.x,dy=target.y-r.y,d=Math.hypot(dx,dy);if(d<=tolerance){this.robot.sendAction({type:'stop'});return{ok:true,ticks:i,distance:d}}const desired=Math.atan2(dy,dx)*180/Math.PI;let error=angleWrap(desired-r.yaw),reverse=false;if(allowReverse&&Math.abs(error)>105){reverse=true;error=angleWrap(error-(error>0?180:-180))}const steer=clamp(-error*0.9,-s.simulation.maxSteeringAngle,s.simulation.maxSteeringAngle),headingScale=Math.max(0.1,1-Math.abs(error)/100),baseLimit=reverse?s.simulation.maxReverseSpeed:s.simulation.maxLinearSpeed,limit=maxSpeedOverride?Math.min(baseLimit,maxSpeedOverride):baseLimit,approach=clamp(d*1.0,4,limit),speedMag=Math.min(approach,limit*headingScale),speed=reverse?-speedMag:speedMag,res=this.robot.sendAction({type:'drive',speed,steeringAngle:steer,dt:s.simulation.dt});if(!res.ok){this.robot.sendAction({type:'stop'});return{ok:false,reason:res.reason||'drive_failed'}}if(!s.simulation.batchMode)await wait(16)}this.robot.sendAction({type:'stop'});return{ok:false,reason:'motion_timeout'}}
- async followPathPurePursuit(waypoints,{maxTicks=1100}={}){const s=this.store.state,dense=densifyPath(s.robot,waypoints,16);s.path={active:true,index:0,waypoints:waypoints.map(p=>({...p})),densePoints:dense,lookaheadTarget:null};this.store.emit();let cteSum=0;for(let i=0;i<maxTicks;i++){const cmd=purePursuitCommand(s.robot,dense,{lookahead:s.simulation.lookaheadDistance,wheelbase:s.simulation.wheelbase,maxSteeringAngle:s.simulation.maxSteeringAngle,maxSpeed:Math.min(92,s.simulation.maxLinearSpeed),minSpeed:8,goalTolerance:12});s.path.index=cmd.index;s.path.lookaheadTarget=cmd.target;cteSum+=cmd.crossTrackError||0;this.store.emit();if(cmd.done){this.robot.sendAction({type:'stop'});s.path.active=false;s.path.lookaheadTarget=null;this.store.emit();return{ok:true,ticks:i,meanCrossTrackError:i?cteSum/i:0}}const res=this.robot.sendAction({type:'drive',speed:cmd.speed,steeringAngle:cmd.steeringAngle,dt:s.simulation.dt});if(!res.ok){this.robot.sendAction({type:'stop'});s.path.active=false;this.store.emit();return{ok:false,reason:res.reason||'drive_failed'}}if(!s.simulation.batchMode)await wait(16)}this.robot.sendAction({type:'stop'});s.path.active=false;this.store.emit();return{ok:false,reason:'motion_timeout'}}
- async followPathPid(waypoints,{maxTicks=1100}={}){const s=this.store.state,dense=densifyPath(s.robot,waypoints,16);s.path={active:true,index:0,waypoints:waypoints.map(p=>({...p})),densePoints:dense,lookaheadTarget:null};this.pid.reset();this.store.emit();let cteSum=0;for(let i=0;i<maxTicks;i++){const cfg=s.simulation.pid||{},cmd=this.pid.command(s.robot,dense,{...cfg,dt:s.simulation.dt,maxSteeringAngle:s.simulation.maxSteeringAngle,maxSpeed:Math.min(88,s.simulation.maxLinearSpeed),minSpeed:8,goalTolerance:12});s.path.index=cmd.index;s.path.lookaheadTarget=cmd.target;cteSum+=cmd.crossTrackError||0;this.store.emit();if(cmd.done){this.robot.sendAction({type:'stop'});s.path.active=false;s.path.lookaheadTarget=null;this.store.emit();return{ok:true,ticks:i,meanCrossTrackError:i?cteSum/i:0}}const res=this.robot.sendAction({type:'drive',speed:cmd.speed,steeringAngle:cmd.steeringAngle,dt:s.simulation.dt});if(!res.ok){this.robot.sendAction({type:'stop'});s.path.active=false;this.store.emit();return{ok:false,reason:res.reason||'drive_failed'}}if(!s.simulation.batchMode)await wait(16)}this.robot.sendAction({type:'stop'});s.path.active=false;this.store.emit();return{ok:false,reason:'motion_timeout'}}
- async followPath(waypoints,opts={}){const s=this.store.state;if(s.simulation.controller==='pure_pursuit'&&waypoints.length>0)return this.followPathPurePursuit(waypoints,opts);if(s.simulation.controller==='pid_path'&&waypoints.length>0)return this.followPathPid(waypoints,opts);s.path={active:true,index:0,waypoints:waypoints.map(p=>({...p})),densePoints:[],lookaheadTarget:null};this.store.emit();let ticks=0;for(let i=0;i<waypoints.length;i++){s.path.index=i;this.store.emit();const m=await this.driveTo(waypoints[i],opts);ticks+=m.ticks||0;if(!m.ok){s.path.active=false;this.store.emit();return m}}s.path.active=false;s.path.index=waypoints.length;this.store.emit();return{ok:true,ticks}}
- pathTo(target){const s=this.store.state;if(!s.obstacle.enabled||s.agent.memory.alternateRoute||!segmentHitsRect(s.robot,target,s.obstacle))return[target];const margin=70,topY=Math.max(60,s.obstacle.y-margin),bottomY=Math.min(500,s.obstacle.y+s.obstacle.h+margin),chooseTop=Math.abs(s.robot.y-topY)+Math.abs(target.y-topY)<=Math.abs(s.robot.y-bottomY)+Math.abs(target.y-bottomY),y=chooseTop?topY:bottomY;return[{x:s.obstacle.x-margin,y},{x:s.obstacle.x+s.obstacle.w+margin,y},target]}
- palletApproachPath(p){const preAlign={x:p.x-170,y:p.y},staging={x:p.x-125,y:p.y};const base=this.pathTo(preAlign);return[...base,staging]}
- async dockToPallet(p){const s=this.store.state;const staging={x:p.x-125,y:p.y},final={x:p.x-82,y:p.y};let ticks=0;if(distance(s.robot,staging)>16){const stage=await this.driveTo(staging,{tolerance:12,maxTicks:360,allowReverse:true,maxSpeedOverride:34});ticks+=stage.ticks||0;if(!stage.ok)return stage}const finalMove=await this.driveTo(final,{tolerance:10,maxTicks:360,allowReverse:false,maxSpeedOverride:18});ticks+=finalMove.ticks||0;if(!finalMove.ok)return finalMove;const yawError=Math.abs(angleWrap(s.robot.yaw));if(yawError>28)return{ok:false,reason:'alignment_heading_error',ticks,yawError};return{ok:true,ticks,yawError,policy:'rule_staged'}}
- async dockToPalletLearned(p){const s=this.store.state;this.bcAlign.model=this.bcAlign.load();if(!this.bcAlign.isReady())return this.dockToPallet(p);const final={x:p.x-82,y:p.y};for(let i=0;i<520;i++){const r=s.robot,dx=final.x-r.x,dy=final.y-r.y,yawError=angleWrap(-r.yaw),d=Math.hypot(dx,dy);if(d<11&&Math.abs(yawError)<24){this.robot.sendAction({type:'stop'});return{ok:true,ticks:i,yawError:Math.abs(yawError),policy:'learned_bc'}}const cmd=this.bcAlign.predict({dx,dy,yawError,speed:r.speed,steeringAngle:r.steeringAngle});if(!cmd)return{ok:false,reason:'bc_model_unavailable'};const res=this.robot.sendAction({type:'drive',speed:cmd.speed,steeringAngle:cmd.steeringAngle,dt:s.simulation.dt});if(!res.ok){this.robot.sendAction({type:'stop'});return{ok:false,reason:res.reason||'drive_failed'}}if(!s.simulation.batchMode)await wait(16)}this.robot.sendAction({type:'stop'});return{ok:false,reason:'learned_alignment_timeout'}}
- async execute(skill,args={}){const s=this.store.state;switch(skill){case'navigate_to_pallet':{const p=s.pallets[args.palletId];if(!p)return{ok:false,reason:'pallet_not_found'};const path=this.palletApproachPath(p),m=await this.followPath(path,{tolerance:12,maxTicks:1100});return m.ok?{ok:true,message:`approached ${p.label} via pre-align path (${s.simulation.controller})`,ticks:m.ticks,meanCrossTrackError:m.meanCrossTrackError??null}:{ok:false,reason:m.reason}}case'detect_pallet':{const p=s.pallets[args.palletId];if(!p)return{ok:false,reason:'pallet_not_found'};if(s.failures.forceDetectionFailure)return{ok:false,reason:'forced_detection_failure'};const d=distance(s.robot,p);if(d>=180)return{ok:false,reason:'pallet_not_visible'};if(!s.perception.detectedPallets.includes(args.palletId))s.perception.detectedPallets.push(args.palletId);this.store.emit();return{ok:true,message:`${p.label} detected (${d.toFixed(0)} px)`}}case'align_to_pallet':{const p=s.pallets[args.palletId];if(!p)return{ok:false,reason:'pallet_not_found'};if(s.failures.forceAlignmentFailure)return{ok:false,reason:'forced_alignment_failure'};const m=await this.dockToPalletLearned(p);if(!m.ok)return{ok:false,reason:m.reason,yawError:m.yawError??null};s.robot.aligned=true;this.store.emit();return{ok:true,message:`aligned by ${m.policy||'rule_staged'} (yaw error ${m.yawError.toFixed(1)}°)`,ticks:m.ticks}}case'insert_forks':if(s.failures.forceInsertionFailure)return{ok:false,reason:'forced_insertion_failure'};s.robot.carrying=args.palletId;s.pallets[args.palletId].status='on_forks';this.store.emit();return{ok:true,message:'forks inserted'};case'lift':this.robot.sendAction({type:'fork',raised:true});return{ok:true,message:'pallet lifted'};case'navigate_to':{const l=s.locations[args.locationId];if(!l)return{ok:false,reason:'location_not_found'};const target={x:l.x-75,y:l.y},m=await this.followPath(this.pathTo(target),{tolerance:12,maxTicks:1100});return m.ok?{ok:true,message:`followed path to ${l.label} (${s.simulation.controller})`,ticks:m.ticks,meanCrossTrackError:m.meanCrossTrackError??null}:{ok:false,reason:m.reason}}case'place':{const l=s.locations[args.locationId],id=s.robot.carrying;if(!id)return{ok:false,reason:'no_load'};s.pallets[id].x=l.x;s.pallets[id].y=l.y;s.pallets[id].status='placed';s.robot.carrying=null;s.robot.forkRaised=false;s.robot.aligned=false;this.store.emit();return{ok:true,message:`placed at ${l.label}`}}case'retreat':{const yaw=s.robot.yaw*Math.PI/180,target={x:s.robot.x-Math.cos(yaw)*70,y:s.robot.y-Math.sin(yaw)*70},m=await this.driveTo(target,{tolerance:10,maxTicks:320,allowReverse:true,maxSpeedOverride:30});if(!m.ok)return{ok:false,reason:m.reason};s.agent.memory.retreated=true;this.store.emit();return{ok:true,message:'retreated in reverse'}}case'avoid_obstacle':s.agent.memory.alternateRoute=true;this.store.emit();return{ok:true,message:'alternate waypoint route enabled'};case'reposition_for_detection':{const yaw=s.robot.yaw*Math.PI/180,target={x:s.robot.x-Math.sin(yaw)*45,y:s.robot.y+Math.cos(yaw)*45},m=await this.driveTo(target,{tolerance:10,maxTicks:260,allowReverse:true,maxSpeedOverride:28});return m.ok?{ok:true,message:'repositioned for another detection attempt'}:{ok:false,reason:m.reason}}default:return{ok:false,reason:`unsupported_policy_skill:${skill}`}}}
+  constructor(store,robot){
+    super(store,robot);
+    this.pid=new PIDPathController();
+    this.bcAlign=new BehaviorCloningAlign();
+    this.learnedPolicies=new Map();
+  }
+
+  useLearned(skillId){return selectedPolicy(skillId)==='learned'&&!!loadSkillModel(skillId)}
+  bcFor(skillId){
+    if(!this.learnedPolicies.has(skillId))this.learnedPolicies.set(skillId,new BehaviorCloningSkill(skillId));
+    const bc=this.learnedPolicies.get(skillId);bc.load();return bc;
+  }
+
+  async driveTo(target,{tolerance=10,maxTicks=420,allowReverse=true,maxSpeedOverride=null}={}){
+    const s=this.store.state;
+    for(let i=0;i<maxTicks;i++){
+      const r=s.robot,dx=target.x-r.x,dy=target.y-r.y,d=Math.hypot(dx,dy);
+      if(d<=tolerance){this.robot.sendAction({type:'stop'});return{ok:true,ticks:i,distance:d,policy:'classic'}}
+      const desired=Math.atan2(dy,dx)*180/Math.PI;
+      let error=angleWrap(desired-r.yaw),reverse=false;
+      if(allowReverse&&Math.abs(error)>105){reverse=true;error=angleWrap(error-(error>0?180:-180))}
+      const steer=clamp(-error*0.9,-s.simulation.maxSteeringAngle,s.simulation.maxSteeringAngle),headingScale=Math.max(0.1,1-Math.abs(error)/100),baseLimit=reverse?s.simulation.maxReverseSpeed:s.simulation.maxLinearSpeed,limit=maxSpeedOverride?Math.min(baseLimit,maxSpeedOverride):baseLimit,approach=clamp(d*1.0,4,limit),speedMag=Math.min(approach,limit*headingScale),speed=reverse?-speedMag:speedMag;
+      const res=this.robot.sendAction({type:'drive',speed,steeringAngle:steer,dt:s.simulation.dt});
+      if(!res.ok){this.robot.sendAction({type:'stop'});return{ok:false,reason:res.reason||'drive_failed'}}
+      if(!s.simulation.batchMode)await wait(16);
+    }
+    this.robot.sendAction({type:'stop'});return{ok:false,reason:'motion_timeout'};
+  }
+
+  async learnedDriveTo(skillId,target,{tolerance=12,maxTicks=900,maxSpeedOverride=null}={}){
+    const s=this.store.state,bc=this.bcFor(skillId);
+    if(!bc.isReady())return{ok:false,reason:'learned_model_unavailable'};
+    for(let i=0;i<maxTicks;i++){
+      const r=s.robot,wx=target.x-r.x,wy=target.y-r.y,d=Math.hypot(wx,wy);
+      if(d<=tolerance){this.robot.sendAction({type:'stop'});return{ok:true,ticks:i,distance:d,policy:'learned_bc'}}
+      const desired=Math.atan2(wy,wx)*180/Math.PI,yawError=angleWrap(desired-r.yaw),a=deg2rad(r.yaw),lateral=-Math.sin(a)*wx+Math.cos(a)*wy;
+      const cmd=bc.predict({dx:d,dy:lateral,yawError,speed:r.speed,steeringAngle:r.steeringAngle});
+      if(!cmd){this.robot.sendAction({type:'stop'});return{ok:false,reason:'learned_model_unavailable'}}
+      const limit=Math.min(maxSpeedOverride||s.simulation.maxLinearSpeed,s.simulation.maxLinearSpeed),speed=clamp(cmd.speed,0,limit),steer=clamp(cmd.steeringAngle,-s.simulation.maxSteeringAngle,s.simulation.maxSteeringAngle);
+      const res=this.robot.sendAction({type:'drive',speed,steeringAngle:steer,dt:s.simulation.dt});
+      if(!res.ok){this.robot.sendAction({type:'stop'});return{ok:false,reason:res.reason||'drive_failed'}}
+      if(!s.simulation.batchMode)await wait(16);
+    }
+    this.robot.sendAction({type:'stop'});return{ok:false,reason:'learned_motion_timeout'};
+  }
+
+  async learnedFollowPath(skillId,waypoints,{tolerance=12,maxTicks=900,maxSpeedOverride=null}={}){
+    const s=this.store.state;
+    s.path={active:true,index:0,waypoints:waypoints.map(p=>({...p})),densePoints:[],lookaheadTarget:null};this.store.emit();
+    let ticks=0;
+    for(let i=0;i<waypoints.length;i++){
+      s.path.index=i;s.path.lookaheadTarget={...waypoints[i]};this.store.emit();
+      const m=await this.learnedDriveTo(skillId,waypoints[i],{tolerance,maxTicks,maxSpeedOverride});ticks+=m.ticks||0;
+      if(!m.ok){s.path.active=false;s.path.lookaheadTarget=null;this.store.emit();return m}
+    }
+    s.path.active=false;s.path.lookaheadTarget=null;s.path.index=waypoints.length;this.store.emit();
+    return{ok:true,ticks,policy:'learned_bc'};
+  }
+
+  async learnedRetreat(target,{tolerance=10,maxTicks=420,referenceYaw=null,start=null}={}){
+    const s=this.store.state,bc=this.bcFor('retreat');
+    if(!bc.isReady())return{ok:false,reason:'learned_model_unavailable'};
+    const refYaw=referenceYaw??s.robot.yaw,origin=start||{x:s.robot.x,y:s.robot.y},a=deg2rad(refYaw);
+    for(let i=0;i<maxTicks;i++){
+      const r=s.robot,d=distance(r,target);
+      if(d<=tolerance){this.robot.sendAction({type:'stop'});return{ok:true,ticks:i,distance:d,policy:'learned_bc'}}
+      const traveledX=r.x-origin.x,traveledY=r.y-origin.y,lateral=-Math.sin(a)*traveledX+Math.cos(a)*traveledY,yawError=angleWrap(refYaw-r.yaw);
+      const cmd=bc.predict({dx:d,dy:lateral,yawError,speed:r.speed,steeringAngle:r.steeringAngle});
+      if(!cmd){this.robot.sendAction({type:'stop'});return{ok:false,reason:'learned_model_unavailable'}}
+      const speed=clamp(Math.min(cmd.speed,-2),-Math.min(30,s.simulation.maxReverseSpeed),-2),steer=clamp(cmd.steeringAngle,-s.simulation.maxSteeringAngle,s.simulation.maxSteeringAngle);
+      const res=this.robot.sendAction({type:'drive',speed,steeringAngle:steer,dt:s.simulation.dt});
+      if(!res.ok){this.robot.sendAction({type:'stop'});return{ok:false,reason:res.reason||'drive_failed'}}
+      if(!s.simulation.batchMode)await wait(16);
+    }
+    this.robot.sendAction({type:'stop'});return{ok:false,reason:'learned_retreat_timeout'};
+  }
+
+  async followPathPurePursuit(waypoints,{maxTicks=1100}={}){
+    const s=this.store.state,dense=densifyPath(s.robot,waypoints,16);
+    s.path={active:true,index:0,waypoints:waypoints.map(p=>({...p})),densePoints:dense,lookaheadTarget:null};this.store.emit();
+    let cteSum=0;
+    for(let i=0;i<maxTicks;i++){
+      const cmd=purePursuitCommand(s.robot,dense,{lookahead:s.simulation.lookaheadDistance,wheelbase:s.simulation.wheelbase,maxSteeringAngle:s.simulation.maxSteeringAngle,maxSpeed:Math.min(92,s.simulation.maxLinearSpeed),minSpeed:8,goalTolerance:12});
+      s.path.index=cmd.index;s.path.lookaheadTarget=cmd.target;cteSum+=cmd.crossTrackError||0;this.store.emit();
+      if(cmd.done){this.robot.sendAction({type:'stop'});s.path.active=false;s.path.lookaheadTarget=null;this.store.emit();return{ok:true,ticks:i,meanCrossTrackError:i?cteSum/i:0,policy:'pure_pursuit'}}
+      const res=this.robot.sendAction({type:'drive',speed:cmd.speed,steeringAngle:cmd.steeringAngle,dt:s.simulation.dt});
+      if(!res.ok){this.robot.sendAction({type:'stop'});s.path.active=false;this.store.emit();return{ok:false,reason:res.reason||'drive_failed'}}
+      if(!s.simulation.batchMode)await wait(16);
+    }
+    this.robot.sendAction({type:'stop'});s.path.active=false;this.store.emit();return{ok:false,reason:'motion_timeout'};
+  }
+
+  async followPathPid(waypoints,{maxTicks=1100}={}){
+    const s=this.store.state,dense=densifyPath(s.robot,waypoints,16);
+    s.path={active:true,index:0,waypoints:waypoints.map(p=>({...p})),densePoints:dense,lookaheadTarget:null};this.pid.reset();this.store.emit();
+    let cteSum=0;
+    for(let i=0;i<maxTicks;i++){
+      const cfg=s.simulation.pid||{},cmd=this.pid.command(s.robot,dense,{...cfg,dt:s.simulation.dt,maxSteeringAngle:s.simulation.maxSteeringAngle,maxSpeed:Math.min(88,s.simulation.maxLinearSpeed),minSpeed:8,goalTolerance:12});
+      s.path.index=cmd.index;s.path.lookaheadTarget=cmd.target;cteSum+=cmd.crossTrackError||0;this.store.emit();
+      if(cmd.done){this.robot.sendAction({type:'stop'});s.path.active=false;s.path.lookaheadTarget=null;this.store.emit();return{ok:true,ticks:i,meanCrossTrackError:i?cteSum/i:0,policy:'pid_path'}}
+      const res=this.robot.sendAction({type:'drive',speed:cmd.speed,steeringAngle:cmd.steeringAngle,dt:s.simulation.dt});
+      if(!res.ok){this.robot.sendAction({type:'stop'});s.path.active=false;this.store.emit();return{ok:false,reason:res.reason||'drive_failed'}}
+      if(!s.simulation.batchMode)await wait(16);
+    }
+    this.robot.sendAction({type:'stop'});s.path.active=false;this.store.emit();return{ok:false,reason:'motion_timeout'};
+  }
+
+  async followPath(waypoints,opts={}){
+    const s=this.store.state;
+    if(s.simulation.controller==='pure_pursuit'&&waypoints.length>0)return this.followPathPurePursuit(waypoints,opts);
+    if(s.simulation.controller==='pid_path'&&waypoints.length>0)return this.followPathPid(waypoints,opts);
+    s.path={active:true,index:0,waypoints:waypoints.map(p=>({...p})),densePoints:[],lookaheadTarget:null};this.store.emit();
+    let ticks=0;
+    for(let i=0;i<waypoints.length;i++){s.path.index=i;this.store.emit();const m=await this.driveTo(waypoints[i],opts);ticks+=m.ticks||0;if(!m.ok){s.path.active=false;this.store.emit();return m}}
+    s.path.active=false;s.path.index=waypoints.length;this.store.emit();return{ok:true,ticks,policy:'rule_waypoint'};
+  }
+
+  pathTo(target){
+    const s=this.store.state;
+    if(!s.obstacle.enabled||s.agent.memory.alternateRoute||!segmentHitsRect(s.robot,target,s.obstacle))return[target];
+    const margin=70,topY=Math.max(60,s.obstacle.y-margin),bottomY=Math.min(500,s.obstacle.y+s.obstacle.h+margin),chooseTop=Math.abs(s.robot.y-topY)+Math.abs(target.y-topY)<=Math.abs(s.robot.y-bottomY)+Math.abs(target.y-bottomY),y=chooseTop?topY:bottomY;
+    return[{x:s.obstacle.x-margin,y},{x:s.obstacle.x+s.obstacle.w+margin,y},target];
+  }
+
+  palletApproachPath(p){const preAlign={x:p.x-170,y:p.y},staging={x:p.x-125,y:p.y};const base=this.pathTo(preAlign);return[...base,staging]}
+
+  async dockToPallet(p){
+    const s=this.store.state,staging={x:p.x-125,y:p.y},final={x:p.x-82,y:p.y};let ticks=0;
+    if(distance(s.robot,staging)>16){const stage=await this.driveTo(staging,{tolerance:12,maxTicks:360,allowReverse:true,maxSpeedOverride:34});ticks+=stage.ticks||0;if(!stage.ok)return stage}
+    const finalMove=await this.driveTo(final,{tolerance:10,maxTicks:360,allowReverse:false,maxSpeedOverride:18});ticks+=finalMove.ticks||0;if(!finalMove.ok)return finalMove;
+    const yawError=Math.abs(angleWrap(s.robot.yaw));if(yawError>28)return{ok:false,reason:'alignment_heading_error',ticks,yawError};
+    return{ok:true,ticks,yawError,policy:'rule_staged'};
+  }
+
+  async dockToPalletLearned(p){
+    const s=this.store.state;this.bcAlign.model=this.bcAlign.load();if(!this.bcAlign.isReady())return this.dockToPallet(p);
+    const final={x:p.x-82,y:p.y};
+    for(let i=0;i<520;i++){
+      const r=s.robot,dx=final.x-r.x,dy=final.y-r.y,yawError=angleWrap(-r.yaw),d=Math.hypot(dx,dy);
+      if(d<11&&Math.abs(yawError)<24){this.robot.sendAction({type:'stop'});return{ok:true,ticks:i,yawError:Math.abs(yawError),policy:'learned_bc'}}
+      const cmd=this.bcAlign.predict({dx,dy,yawError,speed:r.speed,steeringAngle:r.steeringAngle});if(!cmd)return{ok:false,reason:'bc_model_unavailable'};
+      const res=this.robot.sendAction({type:'drive',speed:cmd.speed,steeringAngle:cmd.steeringAngle,dt:s.simulation.dt});if(!res.ok){this.robot.sendAction({type:'stop'});return{ok:false,reason:res.reason||'drive_failed'}}
+      if(!s.simulation.batchMode)await wait(16);
+    }
+    this.robot.sendAction({type:'stop'});return{ok:false,reason:'learned_alignment_timeout'};
+  }
+
+  async execute(skill,args={}){
+    const s=this.store.state;
+    switch(skill){
+      case'navigate_to_pallet':{
+        const p=s.pallets[args.palletId];if(!p)return{ok:false,reason:'pallet_not_found'};
+        const path=this.palletApproachPath(p),learned=this.useLearned(skill),m=learned?await this.learnedFollowPath(skill,path,{tolerance:12,maxTicks:900,maxSpeedOverride:55}):await this.followPath(path,{tolerance:12,maxTicks:1100});
+        return m.ok?{ok:true,message:`approached ${p.label} (${learned?'learned_bc':s.simulation.controller})`,ticks:m.ticks,meanCrossTrackError:m.meanCrossTrackError??null,policy:m.policy}:{ok:false,reason:m.reason};
+      }
+      case'detect_pallet':{
+        const p=s.pallets[args.palletId];if(!p)return{ok:false,reason:'pallet_not_found'};if(s.failures.forceDetectionFailure)return{ok:false,reason:'forced_detection_failure'};
+        const d=distance(s.robot,p);if(d>=180)return{ok:false,reason:'pallet_not_visible'};if(!s.perception.detectedPallets.includes(args.palletId))s.perception.detectedPallets.push(args.palletId);this.store.emit();return{ok:true,message:`${p.label} detected (${d.toFixed(0)} px)`};
+      }
+      case'align_to_pallet':{
+        const p=s.pallets[args.palletId];if(!p)return{ok:false,reason:'pallet_not_found'};if(s.failures.forceAlignmentFailure)return{ok:false,reason:'forced_alignment_failure'};
+        const m=await this.dockToPalletLearned(p);if(!m.ok)return{ok:false,reason:m.reason,yawError:m.yawError??null};s.robot.aligned=true;this.store.emit();return{ok:true,message:`aligned by ${m.policy||'rule_staged'} (yaw error ${m.yawError.toFixed(1)}°)`,ticks:m.ticks,policy:m.policy};
+      }
+      case'insert_forks':
+        if(s.failures.forceInsertionFailure)return{ok:false,reason:'forced_insertion_failure'};s.robot.carrying=args.palletId;s.pallets[args.palletId].status='on_forks';this.store.emit();return{ok:true,message:'forks inserted'};
+      case'lift':
+        this.robot.sendAction({type:'fork',raised:true});return{ok:true,message:'pallet lifted'};
+      case'navigate_to':{
+        const l=s.locations[args.locationId];if(!l)return{ok:false,reason:'location_not_found'};
+        const target={x:l.x-75,y:l.y},path=this.pathTo(target),learned=this.useLearned(skill),m=learned?await this.learnedFollowPath(skill,path,{tolerance:12,maxTicks:900,maxSpeedOverride:55}):await this.followPath(path,{tolerance:12,maxTicks:1100});
+        return m.ok?{ok:true,message:`followed path to ${l.label} (${learned?'learned_bc':s.simulation.controller})`,ticks:m.ticks,meanCrossTrackError:m.meanCrossTrackError??null,policy:m.policy}:{ok:false,reason:m.reason};
+      }
+      case'place':{
+        const l=s.locations[args.locationId],id=s.robot.carrying;if(!id)return{ok:false,reason:'no_load'};s.pallets[id].x=l.x;s.pallets[id].y=l.y;s.pallets[id].status='placed';s.robot.carrying=null;s.robot.forkRaised=false;s.robot.aligned=false;this.store.emit();return{ok:true,message:`placed at ${l.label}`};
+      }
+      case'retreat':{
+        const start={x:s.robot.x,y:s.robot.y},referenceYaw=s.robot.yaw,yaw=deg2rad(referenceYaw),target={x:start.x-Math.cos(yaw)*70,y:start.y-Math.sin(yaw)*70},learned=this.useLearned(skill),m=learned?await this.learnedRetreat(target,{tolerance:10,maxTicks:420,referenceYaw,start}):await this.driveTo(target,{tolerance:10,maxTicks:320,allowReverse:true,maxSpeedOverride:30});
+        if(!m.ok)return{ok:false,reason:m.reason};s.agent.memory.retreated=true;this.store.emit();return{ok:true,message:`retreated (${learned?'learned_bc':'classic'})`,ticks:m.ticks,policy:m.policy};
+      }
+      case'avoid_obstacle':
+        s.agent.memory.alternateRoute=true;this.store.emit();return{ok:true,message:'alternate waypoint route enabled'};
+      case'reposition_for_detection':{
+        const yaw=deg2rad(s.robot.yaw),target={x:s.robot.x-Math.sin(yaw)*45,y:s.robot.y+Math.cos(yaw)*45},m=await this.driveTo(target,{tolerance:10,maxTicks:260,allowReverse:true,maxSpeedOverride:28});return m.ok?{ok:true,message:'repositioned for another detection attempt'}:{ok:false,reason:m.reason};
+      }
+      default:return{ok:false,reason:`unsupported_policy_skill:${skill}`};
+    }
+  }
 }
