@@ -37,7 +37,10 @@ export function loadSkillModel(id){
 export function saveSkillModel(id,model){return write(modelKey(id),{...model,skillId:id})}
 export function clearSkillModel(id){localStorage.removeItem(modelKey(id));if(id==='align_to_pallet')localStorage.removeItem(LEGACY_ALIGN)}
 export function loadDatasetMeta(id){return read(datasetKey(id))}
-export function saveDatasetMeta(id,meta){return write(datasetKey(id),{...meta,skillId:id})}
+export function saveDatasetMeta(id,meta){
+  const previous=read(datasetKey(id)),sameKind=previous&&previous.kind&&previous.kind===meta?.kind;
+  return write(datasetKey(id),{...(sameKind?previous:{}),...meta,skillId:id});
+}
 export function loadSkillEvaluation(id){return read(evaluationKey(id))}
 export function loadSkillEvaluationHistory(id){const v=read(evaluationHistoryKey(id));return Array.isArray(v)?v:[]}
 export function saveSkillEvaluation(id,result){
