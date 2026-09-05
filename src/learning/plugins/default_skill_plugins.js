@@ -5,6 +5,7 @@ import {MotionBehaviorCloningRuntimeAdapter} from './motion_bc_runtime.js';
 import {motionScenarioAdapter,perceptionScenarioAdapter,manipulationScenarioAdapter} from './forklift_evaluation_scenarios.js';
 import {MotionDatasetAdapter} from './motion_dataset_adapter.js';
 import {MotionBcTrainingBackend} from './motion_bc_training_backend.js';
+import {MotionDemonstrationRecorderAdapter} from './motion_demonstration_recorder.js';
 
 const MOTION_SKILLS=['navigate_to_pallet','align_to_pallet','navigate_to','retreat'];
 const metric=(key,label,format='number',unit='',extra={})=>({key,label,format,unit,...extra});
@@ -12,17 +13,19 @@ const successMetric=()=>metric('successRate','成功率','percent','',{primary:t
 const motionRuntimeAdapter=new MotionBehaviorCloningRuntimeAdapter();
 const motionDatasetAdapter=new MotionDatasetAdapter();
 const motionTrainingBackend=new MotionBcTrainingBackend();
+const motionDemoRecorder=new MotionDemonstrationRecorderAdapter(motionDatasetAdapter);
 
 class MotionBehaviorCloningPlugin extends SkillLearningPlugin{
-  constructor(){super({id:'motion_bc',label:'Motion Behavior Cloning',version:3})}
+  constructor(){super({id:'motion_bc',label:'Motion Behavior Cloning',version:4})}
   supports(skillId){return MOTION_SKILLS.includes(skillId)}
-  getCapabilities(){return{trainable:true,evaluable:true,runtimeLearning:true,policies:['classic','learned']}}
+  getCapabilities(){return{trainable:true,evaluable:true,runtimeLearning:true,demonstrationRecording:true,policies:['classic','learned']}}
   getAlgorithms(){return[{id:'behavior_cloning',label:'Behavior Cloning',kind:'imitation'}]}
   getDatasetSchema(skillId){return{type:'observation_action',skillId,observation:['dx','dy','yawError','speed','steeringAngle'],action:['speed','steeringAngle']}}
   getDatasetAdapter(){return motionDatasetAdapter}
+  getDemonstrationRecorderAdapter(){return motionDemoRecorder}
   getTrainingBackend(){return motionTrainingBackend}
   getTrainingParameters(){return[
-    {key:'datasetSource',label:'Dataset',type:'select',default:'synthetic_expert',options:[['synthetic_expert','Synthetic Expert'],['manual_import','Manual / Imported Demo']]},
+    {key:'datasetSource',label:'Dataset',type:'select',default:'synthetic_expert',options:[['synthetic_expert','Synthetic Expert'],['manual_import','Manual / Recorded Demo']]},
     {key:'samples',label:'Samples',type:'number',default:2500,min:200,max:10000,step:100},
     {key:'seed',label:'Seed',type:'number',default:42,step:1},
     {key:'epochs',label:'Epochs',type:'number',default:700,min:50,max:2000,step:50}
@@ -45,7 +48,7 @@ class MotionBehaviorCloningPlugin extends SkillLearningPlugin{
   ]}
   getRuntimePolicyAdapter(){return motionRuntimeAdapter}
   getEvaluationScenarioAdapter(){return motionScenarioAdapter}
-  getNote(skillId){return`${skillId} 用の連続制御学習Plugin。Dataset / Training Backend / Runtime / Evaluation Scenario / VisualizationをPlugin側で定義します。`}
+  getNote(skillId){return`${skillId} 用の連続制御学習Plugin。Dataset / Demonstration Recorder / Training Backend / Runtime / Evaluation Scenario / VisualizationをPlugin側で定義します。`}
   async train(skillId,{datasetSource='synthetic_expert',samples=2500,seed=42,epochs=null,onProgress=null}={}){
     if(!this.supports(skillId))throw new Error(`unsupported_skill_for_plugin:${skillId}`);
     const datasetRequest=await motionDatasetAdapter.buildTrainingDataset(skillId,{source:datasetSource,samples,seed});
@@ -59,9 +62,9 @@ class MotionBehaviorCloningPlugin extends SkillLearningPlugin{
 }
 
 const perceptionPlugin=new DescriptorOnlyLearningPlugin({
-  id:'perception_future',label:'Perception Learning Adapter',version:3,skills:['detect_pallet'],
+  id:'perception_future',label:'Perception Learning Adapter',version:4,skills:['detect_pallet'],
   descriptor:{
-    capabilities:{trainable:false,evaluable:true,runtimeLearning:false,policies:['classic']},
+    capabilities:{trainable:false,evaluable:true,runtimeLearning:false,demonstrationRecording:false,policies:['classic']},
     algorithms:[{id:'detector',label:'Detector / Segmentation / VLM',kind:'perception'}],
     datasetSchema:{type:'image_annotation',observation:['rgb','depth?'],target:['bbox','mask','keypoints','pose']},
     trainingParameters:[],
@@ -69,14 +72,14 @@ const perceptionPlugin=new DescriptorOnlyLearningPlugin({
     evaluationMetrics:[successMetric(),metric('avgControlTicks','処理Step','integer','',{better:'lower'})],
     evaluationScenarioAdapter:perceptionScenarioAdapter,
     visualizations:[{id:'detection_examples',type:'capability_note',title:'将来の可視化',text:'検出画像 / PR Curve / Confusion Matrix / Pose Error'}],
-    note:'Camera観測を追加したときに、画像Dataset・Detector/VLM学習・知覚Runtime・知覚Scenarioへ差し替えます。'
+    note:'Camera観測を追加したときに、画像Dataset・Annotation Recorder・Detector/VLM学習・知覚Runtime・知覚Scenarioへ差し替えます。'
   }
 });
 
 const manipulationPlugin=new DescriptorOnlyLearningPlugin({
-  id:'manipulation_future',label:'Manipulation Learning Adapter',version:3,skills:['insert_forks','lift','place'],
+  id:'manipulation_future',label:'Manipulation Learning Adapter',version:4,skills:['insert_forks','lift','place'],
   descriptor:{
-    capabilities:{trainable:false,evaluable:true,runtimeLearning:false,policies:['classic']},
+    capabilities:{trainable:false,evaluable:true,runtimeLearning:false,demonstrationRecording:false,policies:['classic']},
     algorithms:[{id:'sequence_policy',label:'BC / ACT / Diffusion Policy / RL',kind:'manipulation'}],
     datasetSchema:{type:'trajectory',observation:['robot_state','fork_state','camera?','depth?'],action:['fork','speed','steering']},
     trainingParameters:[],
@@ -84,7 +87,7 @@ const manipulationPlugin=new DescriptorOnlyLearningPlugin({
     evaluationMetrics:[successMetric(),metric('avgControlTicks','平均制御Step','integer','',{better:'lower'})],
     evaluationScenarioAdapter:manipulationScenarioAdapter,
     visualizations:[{id:'manipulation_future',type:'capability_note',title:'将来の可視化',text:'Action系列 / 接触位置 / 3D軌跡 / 成功・失敗リプレイ'}],
-    note:'現在のSimulatorでは操作が瞬時状態遷移です。物理自由度を追加後、Runtime/Scenarioを含めてPluginを具体実装へ差し替えます。'
+    note:'現在のSimulatorでは操作が瞬時状態遷移です。物理自由度を追加後、Recorder/Runtime/Scenarioを含めてPluginを具体実装へ差し替えます。'
   }
 });
 
