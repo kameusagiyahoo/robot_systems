@@ -198,11 +198,24 @@
 - [x] append / replace existing manual dataset
 - [x] recorded dataset selectable by Training Plugin
 - [x] recorder metadata included in Episode snapshot
+
+### v2.5 — Training safety / Model identity / Skill Package
+- [x] Web Worker training cancellation
+- [x] configurable training timeout
+- [x] no main-thread fallback after cancel / timeout
+- [x] deterministic Model ID
+- [x] SHA-256 Model checksum with fallback hash
+- [x] Model ID/checksum in Episode metadata
+- [x] Skill Learning Package export
+- [x] Package checksum validation
+- [x] Model checksum validation on Package import
+- [x] restore Model / Dataset / Policy / Evaluation history from Package
 - [ ] official LeRobotDataset converter / importer
-- [ ] Worker cancellation / timeout
-- [ ] model ID / checksum
-- [ ] Plugin package import/export format
-- [ ] demonstration episode boundaries / quality labels / DAgger support
+- [ ] demonstration episode boundaries / quality labels
+- [ ] DAgger / corrective demonstration workflow
+- [ ] plugin-local visualization registration
+- [ ] train / validation dataset split
+- [ ] rollout benchmark linked to Model ID
 
 ## Phase 1 — Cloudflare + OpenAI Planner
 - [ ] Move deployment from GitHub Pages to Cloudflare Pages
