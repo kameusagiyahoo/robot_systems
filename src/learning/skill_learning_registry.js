@@ -51,6 +51,12 @@ export function saveSkillEvaluation(id,result){
   write(evaluationHistoryKey(id),history.slice(-100));
   return record;
 }
+export function replaceSkillEvaluationHistory(id,records=[]){
+  const history=(Array.isArray(records)?records:[]).map(r=>({...r,skillId:id})).slice(-100);
+  write(evaluationHistoryKey(id),history);
+  if(history.length)write(evaluationKey(id),history[history.length-1]);else localStorage.removeItem(evaluationKey(id));
+  return history;
+}
 export function clearSkillEvaluation(id){localStorage.removeItem(evaluationKey(id));localStorage.removeItem(evaluationHistoryKey(id))}
 export function latestEvaluationForPolicy(id,policy,controller=null){
   const history=loadSkillEvaluationHistory(id);
