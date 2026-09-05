@@ -45,6 +45,8 @@ function render(){
   const state=skillLearningState(skillId),dataset=loadDatasetMeta(skillId),policy=selectedPolicy(skillId),evaluation=latestEvaluationForPolicy(skillId,policy)||state.evaluation;
   $('#skillTitle').textContent=`${def.code} / ${def.label}`;$('#skillDesc').textContent=def.desc;$('#skillNumber').textContent=`${def.order} / ${SKILL_LEARNING_REGISTRY.length}`;
   $('#pluginState').textContent=`${descriptor.pluginLabel} v${descriptor.pluginVersion}`;
+  $('#runtimeAdapterState').textContent=descriptor.runtimePolicyAdapter?`${descriptor.runtimePolicyAdapter.label} v${descriptor.runtimePolicyAdapter.version}`:'Classic Runtimeのみ';
+  $('#scenarioAdapterState').textContent=descriptor.evaluationScenarioAdapter?`${descriptor.evaluationScenarioAdapter.label} v${descriptor.evaluationScenarioAdapter.version}`:'未定義';
   $('#policyState').textContent=policy==='learned'?'Learned Policy':'Classic Policy';
   $('#algorithmState').textContent=(descriptor.algorithms||[]).map(a=>a.label).join(' / ')||'なし';
   const schema=descriptor.datasetSchema;$('#datasetSchema').textContent=schema?`${schema.type} · ${(schema.observation||[]).join(', ')}`:'未定義';
@@ -56,7 +58,7 @@ function render(){
   $('#evalLink').href=`./evaluate.html?skill=${encodeURIComponent(skillId)}`;
   const indicator=$('#learnIndicator');indicator.className='learn-indicator';
   if(!descriptor.capabilities.trainable){indicator.textContent='×';indicator.classList.add('blocked');$('#learnTitle').textContent='このPluginでは現在学習不可';$('#learnMessage').textContent='評価と将来の拡張点はPlugin定義から表示しています。';$('#trainBtn').disabled=true;$('#trainBtn').textContent='現在は学習できません'}
-  else if(state.model){indicator.textContent='✓';indicator.classList.add('ready');$('#learnTitle').textContent='学習済み';$('#learnMessage').textContent=descriptor.capabilities.runtimeLearning?'Classic / Learnedを切り替えて実行・比較できます。':'モデル保存済み。Runtime接続は未対応です。';$('#trainBtn').disabled=false;$('#trainBtn').textContent='もう一度学習'}
+  else if(state.model){indicator.textContent='✓';indicator.classList.add('ready');$('#learnTitle').textContent='学習済み';$('#learnMessage').textContent=descriptor.capabilities.runtimeLearning?'Plugin RuntimeでClassic / Learnedを切り替えて実行・比較できます。':'モデル保存済み。Runtime Adapterは未対応です。';$('#trainBtn').disabled=false;$('#trainBtn').textContent='もう一度学習'}
   else{indicator.textContent='－';$('#learnTitle').textContent='未学習';$('#learnMessage').textContent=`${descriptor.pluginLabel} が学習処理を提供します。`;$('#trainBtn').disabled=false;$('#trainBtn').textContent='このSkillを学習'}
   renderPolicyButtons(state);renderVisualizations(state,dataset);
 }
