@@ -1,1 +1,102 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Learned Align Training</title><link rel="stylesheet" href="./style.css"></head><body><header class="app-header"><div><h1>Learned Align Training <span>v1.7</span></h1><p>Behavior Cloningで align_to_pallet 専用Policyを学習</p></div></header><main class="layout"><section class="card action-card"><div class="section-label">1. データを作る</div><h2>Synthetic Expert Demonstrations</h2><p>初期版ではシミュレータ上の専門家制御から教師データを生成します。後で手動操作ログへ置換可能です。</p><div class="form-grid"><label>Samples <input id="samples" type="number" min="200" max="10000" value="2500"></label><label>Seed <input id="seed" type="number" value="42"></label></div><div class="button-row"><button id="generateBtn" class="primary">デモ生成</button></div><pre id="datasetState" class="data-box">まだ生成していません。</pre></section><section class="card status-card"><div class="section-label">2. 学習する</div><h2>Behavior Cloning</h2><div class="button-row"><button id="trainBtn" class="primary big">学習開始</button><button id="clearBtn">学習モデル削除</button></div><pre id="modelState" class="data-box">学習モデルを確認中...</pre><p class="hint">学習済みモデルはこのブラウザのlocalStorageに保存されます。</p></section><section class="card settings-card"><div class="section-label">3. メイン画面で使う</div><h2>Learned Align Policy</h2><p>学習後はメイン画面の <code>align_to_pallet</code> が学習済みPolicyを自動利用します。モデルが無い場合は従来のstaged dockingへフォールバックします。</p><div class="button-row"><a href="./index.html"><button class="primary">メイン画面へ戻る</button></a></div></section></main><script type="module">import {BehaviorCloningAlign,generateSyntheticDemos} from './src/learning/behavior_cloning_align.js';const $=s=>document.querySelector(s),bc=new BehaviorCloningAlign();let demos=[];function render(){const m=bc.load();bc.model=m;$('#modelState').textContent=m?JSON.stringify(m,null,2):'学習モデルはまだありません。'}render();$('#generateBtn').onclick=()=>{const n=Math.max(200,Math.min(10000,Number($('#samples').value)||2500)),seed=Number($('#seed').value)||42;demos=generateSyntheticDemos(n,seed);$('#datasetState').textContent=JSON.stringify({samples:demos.length,seed,example:demos[0]},null,2)};$('#trainBtn').onclick=()=>{if(!demos.length){$('#generateBtn').click()}$('#modelState').textContent='学習中...';setTimeout(()=>{const m=bc.train(demos);$('#modelState').textContent=JSON.stringify(m,null,2)},20)};$('#clearBtn').onclick=()=>{bc.clear();demos=[];$('#datasetState').textContent='まだ生成していません。';render()};</script></body></html>
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>AlignToPallet Training v1.7.4</title>
+  <link rel="stylesheet" href="./style.css">
+  <style>
+    body{min-height:100dvh;overflow:hidden;background:#eef2f5}
+    .learn-screen{height:100dvh;display:grid;grid-template-rows:auto 1fr auto;max-width:760px;margin:auto;background:#eef2f5}
+    .learn-top{padding:10px 12px;background:#17202a;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .learn-top strong{font-size:1rem}.learn-top span{font-size:.72rem;opacity:.7}.back-link{color:#fff;text-decoration:none;font-weight:800;font-size:.8rem;border:1px solid rgba(255,255,255,.25);border-radius:9px;padding:7px 9px}
+    .learn-main{min-height:0;display:grid;grid-template-rows:auto auto 1fr;gap:8px;padding:8px;overflow:hidden}
+    .skill-focus,.learn-status,.learn-details{background:#fff;border:1px solid #dce4e9;border-radius:12px;padding:11px}
+    .skill-focus{display:flex;align-items:center;justify-content:space-between;gap:10px}.skill-focus small{display:block;color:#71808a;font-weight:800;font-size:.67rem}.skill-focus h1{font-size:1.05rem;margin:2px 0 0}.skill-number{font-size:.72rem;font-weight:900;background:#edf2f5;border-radius:999px;padding:6px 8px;white-space:nowrap}
+    .learn-status{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center}.learn-indicator{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;font-size:1.3rem;font-weight:900;background:#edf1f4;color:#66737c}.learn-indicator.ready{background:#dff2e6;color:#176b3b}.learn-status h2{font-size:1rem;margin:0}.learn-status p{margin:3px 0 0;font-size:.76rem;color:#6b7780}.model-mini{margin-top:5px;font-size:.7rem;color:#53636e;font-weight:700}
+    .learn-details{min-height:0;overflow:auto}.learn-details p{font-size:.76rem;margin:0 0 8px}.learn-details details{border-top:1px solid #edf1f4;padding-top:8px;margin-top:8px}.learn-details summary{font-size:.78rem;font-weight:850}.learn-details .form-grid{margin-top:8px}.learn-details pre{max-height:110px;font-size:.65rem}.learn-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px max(8px,env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));background:#fff;border-top:1px solid #dce4e9}.learn-actions button,.learn-actions a{min-height:48px;font-size:.9rem}.learn-actions .primary-action{grid-column:1/-1;background:#17202a;color:#fff;border-color:#17202a}.learn-actions .go-main{grid-column:1/-1;background:#197a43;color:#fff;border:1px solid #197a43;border-radius:10px;text-decoration:none;display:flex;align-items:center;justify-content:center;font-weight:850}.learn-actions .secondary-action{grid-column:1/-1}
+    .hidden{display:none!important}.training-note{font-size:.72rem;color:#9a6700;font-weight:800;margin-top:5px}
+    @media(min-width:700px){body{overflow:auto}.learn-screen{height:auto;min-height:100dvh}.learn-main{overflow:visible}.learn-details{overflow:visible}.learn-actions{position:sticky;bottom:0}}
+  </style>
+</head>
+<body>
+<div class="learn-screen">
+  <header class="learn-top">
+    <div><strong>Skill Training</strong> <span>v1.7.4</span></div>
+    <a class="back-link" href="./index.html">← Taskへ戻る</a>
+  </header>
+
+  <main class="learn-main">
+    <section class="skill-focus">
+      <div><small>Task Pipeline の学習対象Skill</small><h1>AlignToPallet</h1></div>
+      <div class="skill-number">3 / 8</div>
+    </section>
+
+    <section class="learn-status">
+      <div id="learnIndicator" class="learn-indicator">－</div>
+      <div>
+        <h2 id="learnTitle">状態を確認中...</h2>
+        <p id="learnMessage">Behavior Cloningモデルを確認しています。</p>
+        <div id="modelMini" class="model-mini"></div>
+        <div id="trainingNote" class="training-note hidden">学習中です。この画面のまま数秒待ってください。</div>
+      </div>
+    </section>
+
+    <section class="learn-details">
+      <p><strong>何を学習する？</strong><br>パレット手前での精密な位置合わせです。長距離移動はPure Pursuit / PIDのままです。</p>
+      <details>
+        <summary>学習設定</summary>
+        <div class="form-grid">
+          <label>Samples <input id="samples" type="number" min="200" max="10000" value="2500"></label>
+          <label>Seed <input id="seed" type="number" value="42"></label>
+        </div>
+        <p>「学習する」を押すと教師データ生成から学習まで自動で実行します。</p>
+      </details>
+      <details>
+        <summary>モデル詳細を見る</summary>
+        <pre id="modelState" class="data-box">確認中...</pre>
+      </details>
+    </section>
+  </main>
+
+  <footer class="learn-actions">
+    <button id="trainBtn" class="primary-action">このSkillを学習する</button>
+    <a id="goMainBtn" class="go-main hidden" href="./index.html">✓ 学習完了 → メイン画面で試す</a>
+    <button id="clearBtn" class="secondary-action">学習モデルを削除</button>
+  </footer>
+</div>
+
+<script type="module">
+import {BehaviorCloningAlign,generateSyntheticDemos} from './src/learning/behavior_cloning_align.js';
+const $=s=>document.querySelector(s),bc=new BehaviorCloningAlign();
+function render(){
+  const m=bc.load();bc.model=m;
+  const ready=!!m;
+  $('#learnIndicator').textContent=ready?'✓':'－';
+  $('#learnIndicator').classList.toggle('ready',ready);
+  $('#learnTitle').textContent=ready?'学習済み':'未学習';
+  $('#learnMessage').textContent=ready?'このモデルはAlignToPalletで自動使用されます。':'下の「このSkillを学習する」を押してください。';
+  $('#modelMini').textContent=ready?`${m.samples||'?'} samples / loss ${Number(m.loss||0).toFixed(4)}`:'';
+  $('#modelState').textContent=ready?JSON.stringify(m,null,2):'学習モデルはまだありません。';
+  $('#goMainBtn').classList.toggle('hidden',!ready);
+  $('#trainBtn').textContent=ready?'もう一度学習する':'このSkillを学習する';
+}
+render();
+$('#trainBtn').onclick=()=>{
+  const n=Math.max(200,Math.min(10000,Number($('#samples').value)||2500));
+  const seed=Number($('#seed').value)||42;
+  $('#trainBtn').disabled=true;
+  $('#trainBtn').textContent='学習中...';
+  $('#trainingNote').classList.remove('hidden');
+  requestAnimationFrame(()=>setTimeout(()=>{
+    const demos=generateSyntheticDemos(n,seed);
+    bc.train(demos);
+    $('#trainingNote').classList.add('hidden');
+    $('#trainBtn').disabled=false;
+    render();
+  },30));
+};
+$('#clearBtn').onclick=()=>{bc.clear();render()};
+</script>
+</body>
+</html>
