@@ -11,6 +11,7 @@
 ### v0.2 — Manual operation
 - [x] Basic manual movement controls
 - [x] Fork up/down state
+- [x] long-press touch driving for demonstration recording
 - [ ] Keyboard controls
 - [ ] Touch joystick
 
@@ -187,11 +188,21 @@
 - [x] LeRobot conversion用 intermediate JSON export
 - [x] Plugin / Policy / Model / Dataset metadata snapshot in Episode
 - [x] per-step runtimePlugin / runtimeAdapter metadata
-- [ ] Skill-specific manual demonstration recorder
+
+### v2.4 — Demonstration Recorder Framework
+- [x] Demonstration Recorder Adapter interface
+- [x] Plugin Registry exposes Skill-specific recorder
+- [x] Motion Skill manual demonstration recorder
+- [x] NavigateToPallet / AlignToPallet / Transport / Retreat recording
+- [x] long-press manual controls sampled at simulator cadence
+- [x] append / replace existing manual dataset
+- [x] recorded dataset selectable by Training Plugin
+- [x] recorder metadata included in Episode snapshot
 - [ ] official LeRobotDataset converter / importer
 - [ ] Worker cancellation / timeout
 - [ ] model ID / checksum
 - [ ] Plugin package import/export format
+- [ ] demonstration episode boundaries / quality labels / DAgger support
 
 ## Phase 1 — Cloudflare + OpenAI Planner
 - [ ] Move deployment from GitHub Pages to Cloudflare Pages
@@ -286,5 +297,5 @@ Evaluation:
 2. Precise/safety-critical motion remains in deterministic or validated Policy/Controller unless research explicitly tests alternatives.
 3. `RobotInterface` stays stable so SimRobot → PiRobot → ForkliftRobot is a replaceable adapter.
 4. Every episode is recorded as observation/state/action/result data.
-5. Skill Learning Framework自体は学習方式を固定せず、Dataset / Algorithm / Training Backend / Runtime / Evaluation / VisualizationをPluginで差し替える。
+5. Skill Learning Framework自体は学習方式を固定せず、Dataset / Demonstration Recording / Algorithm / Training Backend / Runtime / Evaluation / VisualizationをPluginで差し替える。
 6. LeRobot, VLA, World Model, etc. are introduced only when the corresponding research question exists.
