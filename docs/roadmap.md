@@ -152,6 +152,47 @@
 - [x] migration-ready interfaces documented in `docs/migration_gate.md`
 - [x] Cloudflare/OpenAI migration gate reached
 
+### v2.0 — Skill Learning / Evaluation
+- [x] Skillごとの学習状態管理
+- [x] Classic / Learned Policy切替
+- [x] Skill単体評価
+- [x] Classic vs Learned比較
+- [x] Policy別評価履歴
+- [x] learned runtime for NavigateToPallet / AlignToPallet / Transport / Retreat
+
+### v2.1 — Plugin-based Learning Framework
+- [x] SkillLearningPlugin interface
+- [x] Plugin Registry / Skill binding
+- [x] dynamic training parameters
+- [x] dynamic evaluation parameters / metrics
+- [x] Visualization Renderer registry
+- [x] Plugin-defined primary evaluation metric
+- [x] loss curve / dataset distribution / policy comparison visualization
+
+### v2.2 — Runtime / Evaluation adapters
+- [x] Runtime Policy Adapter
+- [x] SkillExecutor → Runtime Router → learned Plugin Runtime
+- [x] remove learned algorithm code from RulePolicy
+- [x] Evaluation Scenario Adapter
+- [x] remove Skill-specific scenario switch from generic evaluator
+- [x] named Domain Service interface for Plugin runtimes
+
+### v2.3 — Worker / Dataset / Reproducibility
+- [x] Web Worker Training Backend
+- [x] pure motion BC training core
+- [x] Dataset Adapter interface
+- [x] synthetic expert dataset source
+- [x] manual/imported observation-action JSON source
+- [x] portable dataset JSON export
+- [x] LeRobot conversion用 intermediate JSON export
+- [x] Plugin / Policy / Model / Dataset metadata snapshot in Episode
+- [x] per-step runtimePlugin / runtimeAdapter metadata
+- [ ] Skill-specific manual demonstration recorder
+- [ ] official LeRobotDataset converter / importer
+- [ ] Worker cancellation / timeout
+- [ ] model ID / checksum
+- [ ] Plugin package import/export format
+
 ## Phase 1 — Cloudflare + OpenAI Planner
 - [ ] Move deployment from GitHub Pages to Cloudflare Pages
 - [ ] Keep repository private
@@ -245,4 +286,5 @@ Evaluation:
 2. Precise/safety-critical motion remains in deterministic or validated Policy/Controller unless research explicitly tests alternatives.
 3. `RobotInterface` stays stable so SimRobot → PiRobot → ForkliftRobot is a replaceable adapter.
 4. Every episode is recorded as observation/state/action/result data.
-5. LeRobot, VLA, World Model, etc. are introduced only when the corresponding research question exists.
+5. Skill Learning Framework自体は学習方式を固定せず、Dataset / Algorithm / Training Backend / Runtime / Evaluation / VisualizationをPluginで差し替える。
+6. LeRobot, VLA, World Model, etc. are introduced only when the corresponding research question exists.
