@@ -9,7 +9,7 @@ export class SkillLearningPlugin{
   getDatasetSchema(){return null}
   getTrainingParameters(){return[]}
   getEvaluationParameters(){return[]}
-  getEvaluationMetrics(){return[{key:'successRate',label:'成功率',format:'percent'}]}
+  getEvaluationMetrics(){return[{key:'successRate',label:'成功率',format:'percent',primary:true,better:'higher',goodThreshold:.8}]}
   getVisualizations(){return[]}
   getNote(){return''}
   async train(){throw new Error(`training_not_supported:${this.id}`)}
@@ -18,6 +18,7 @@ export class SkillLearningPlugin{
     return defaultEvaluator(skillId,options);
   }
   describe(skillId){
+    const evaluationMetrics=this.getEvaluationMetrics(skillId);
     return{
       pluginId:this.id,
       pluginLabel:this.label,
@@ -27,7 +28,8 @@ export class SkillLearningPlugin{
       datasetSchema:this.getDatasetSchema(skillId),
       trainingParameters:this.getTrainingParameters(skillId),
       evaluationParameters:this.getEvaluationParameters(skillId),
-      evaluationMetrics:this.getEvaluationMetrics(skillId),
+      evaluationMetrics,
+      primaryEvaluationMetric:evaluationMetrics.find(m=>m.primary)||evaluationMetrics[0]||null,
       visualizations:this.getVisualizations(skillId),
       note:this.getNote(skillId)
     };
