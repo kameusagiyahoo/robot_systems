@@ -12,12 +12,14 @@ export const SKILL_LEARNING_REGISTRY=[
 const MODEL_PREFIX='forklift_skill_model_v1:';
 const DATASET_PREFIX='forklift_skill_dataset_meta_v1:';
 const POLICY_PREFIX='forklift_skill_policy_v1:';
+const EVAL_PREFIX='forklift_skill_evaluation_v1:';
 const LEGACY_ALIGN='forklift_bc_align_v1';
 
 export function getSkillDefinition(id){return SKILL_LEARNING_REGISTRY.find(s=>s.id===id)||null}
 export function modelKey(id){return `${MODEL_PREFIX}${id}`}
 export function datasetKey(id){return `${DATASET_PREFIX}${id}`}
 export function policyKey(id){return `${POLICY_PREFIX}${id}`}
+export function evaluationKey(id){return `${EVAL_PREFIX}${id}`}
 function read(key){try{return JSON.parse(localStorage.getItem(key)||'null')}catch{return null}}
 function write(key,value){localStorage.setItem(key,JSON.stringify(value));return value}
 
@@ -34,6 +36,9 @@ export function saveSkillModel(id,model){return write(modelKey(id),{...model,ski
 export function clearSkillModel(id){localStorage.removeItem(modelKey(id));if(id==='align_to_pallet')localStorage.removeItem(LEGACY_ALIGN)}
 export function loadDatasetMeta(id){return read(datasetKey(id))}
 export function saveDatasetMeta(id,meta){return write(datasetKey(id),{...meta,skillId:id})}
+export function loadSkillEvaluation(id){return read(evaluationKey(id))}
+export function saveSkillEvaluation(id,result){return write(evaluationKey(id),{...result,skillId:id})}
+export function clearSkillEvaluation(id){localStorage.removeItem(evaluationKey(id))}
 export function selectedPolicy(id){
   const v=localStorage.getItem(policyKey(id));
   if(v)return v;
@@ -42,9 +47,7 @@ export function selectedPolicy(id){
 }
 export function setSelectedPolicy(id,policy){localStorage.setItem(policyKey(id),policy)}
 export function skillLearningState(id){
-  const def=getSkillDefinition(id),model=loadSkillModel(id),dataset=loadDatasetMeta(id),policy=selectedPolicy(id);
-  return{definition:def,model,dataset,policy,trained:!!model,trainable:!!def?.trainable,runtimeLearning:!!def?.runtimeLearning};
+  const def=getSkillDefinition(id),model=loadSkillModel(id),dataset=loadDatasetMeta(id),policy=selectedPolicy(id),evaluation=loadSkillEvaluation(id);
+  return{definition:def,model,dataset,policy,evaluation,trained:!!model,trainable:!!def?.trainable,runtimeLearning:!!def?.runtimeLearning};
 }
-export function learningSummary(){
-  return SKILL_LEARNING_REGISTRY.map(s=>skillLearningState(s.id));
-}
+export function learningSummary(){return SKILL_LEARNING_REGISTRY.map(s=>skillLearningState(s.id))}
