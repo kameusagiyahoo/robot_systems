@@ -7,6 +7,7 @@ function card(title){const el=document.createElement('section');el.className='pl
 function canvas2d(parent,width=320,height=120){const c=document.createElement('canvas');c.width=width;c.height=height;c.className='plugin-viz-canvas';parent.appendChild(c);return[c,c.getContext('2d')]}
 function clear(ctx,w,h){ctx.clearRect(0,0,w,h);ctx.strokeStyle='#dce4e9';ctx.lineWidth=1;ctx.strokeRect(.5,.5,w-1,h-1)}
 function num(v,d=3){return Number.isFinite(Number(v))?Number(v).toFixed(d):'-'}
+function metricText(value,format='number'){if(!Number.isFinite(Number(value)))return'-';if(format==='percent')return`${(Number(value)*100).toFixed(0)}%`;return num(value,2)}
 
 registerLearningVisualizationRenderer('capability_note',(spec)=>{const el=card(spec.title);const p=document.createElement('p');p.className='plugin-viz-note';p.textContent=spec.text||'このPluginが可視化内容を定義します。';el.appendChild(p);return el});
 
@@ -27,10 +28,11 @@ registerLearningVisualizationRenderer('dataset_distribution',(spec,context)=>{
 });
 
 registerLearningVisualizationRenderer('policy_comparison',(spec,context)=>{
-  const el=card(spec.title),classic=context.classicEvaluation,learned=context.learnedEvaluation,wrap=document.createElement('div');wrap.className='plugin-compare-bars';
-  const make=(label,e)=>{const row=document.createElement('div'),score=e&&Number.isFinite(e.successRate)?Math.round(e.successRate*100):null;row.innerHTML=`<span>${label}</span><div><i style="width:${score??0}%"></i></div><strong>${score===null?'-':score+'%'}</strong>`;return row};
+  const el=card(spec.title),classic=context.classicEvaluation,learned=context.learnedEvaluation,metric=spec.metric||'successRate',format=spec.format||'number',wrap=document.createElement('div');wrap.className='plugin-compare-bars';
+  const raw=[classic?.[metric],learned?.[metric]].filter(v=>Number.isFinite(Number(v))).map(Number),max=Math.max(1e-9,...raw.map(v=>Math.abs(v)));
+  const make=(label,e)=>{const row=document.createElement('div'),value=e?.[metric],ratio=Number.isFinite(Number(value))?Math.min(100,Math.abs(Number(value))/max*100):0;row.innerHTML=`<span>${label}</span><div><i style="width:${ratio}%"></i></div><strong>${metricText(value,format)}</strong>`;return row};
   wrap.appendChild(make('Classic',classic));wrap.appendChild(make('Learned',learned));el.appendChild(wrap);
-  const note=document.createElement('div');note.className='plugin-viz-meta';if(classic&&learned){const d=(learned.successRate-classic.successRate)*100;note.textContent=`Learned ${d>=0?'+':''}${d.toFixed(0)} pt`}else note.textContent='両Policyを評価すると比較できます。';el.appendChild(note);return el;
+  const note=document.createElement('div');note.className='plugin-viz-meta';if(classic&&learned&&Number.isFinite(Number(classic[metric]))&&Number.isFinite(Number(learned[metric]))){const d=Number(learned[metric])-Number(classic[metric]),direction=spec.better==='lower'?-d:d,suffix=format==='percent'?' pt':'';note.textContent=`Learned ${direction>=0?'+':''}${format==='percent'?(direction*100).toFixed(0):direction.toFixed(2)}${suffix} (${spec.better==='lower'?'低いほど良い':'高いほど良い'})`}else note.textContent='両Policyを評価すると比較できます。';el.appendChild(note);return el;
 });
 
 export function renderLearningVisualizations(host,specs=[],context={}){
