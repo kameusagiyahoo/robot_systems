@@ -79,7 +79,6 @@
 - [x] controller metadata
 - [x] mean cross-track error metric
 - [ ] deterministic random seed
-- [ ] batch evaluation runner
 
 ### v1.0 — Continuous motion simulator
 - [x] linear velocity state
@@ -120,8 +119,22 @@
 - [x] adjustable lookahead distance in UI
 - [x] lookahead point visualization
 - [x] mean cross-track error in Episode metrics
-- [ ] batch controller comparison
-- [ ] automatic repeated trials
+
+### v1.4 — Batch Evaluation
+- [x] automatic repeated trials in browser
+- [x] compare Pure Pursuit vs Rule Waypoint under the same task and obstacle settings
+- [x] fast batch mode without animation delay
+- [x] success rate
+- [x] collision rate
+- [x] average path length
+- [x] average simulated completion time
+- [x] average control tick count
+- [x] average cross-track error
+- [x] average failure / recovery counts
+- [x] 1–100 trials per controller from UI
+- [ ] deterministic seeded scenario randomization
+- [ ] CSV / JSON export of batch result
+- [ ] multi-scenario benchmark suite
 
 ## Phase 1 — Cloudflare + OpenAI Planner
 - [ ] Move deployment from GitHub Pages to Cloudflare Pages
