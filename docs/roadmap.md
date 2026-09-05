@@ -78,7 +78,7 @@
 - [x] collision count
 - [x] controller metadata
 - [x] mean cross-track error metric
-- [ ] deterministic random seed
+- [x] deterministic seeded scenario generation
 
 ### v1.0 — Continuous motion simulator
 - [x] linear velocity state
@@ -122,19 +122,32 @@
 
 ### v1.4 — Batch Evaluation
 - [x] automatic repeated trials in browser
-- [x] compare Pure Pursuit vs Rule Waypoint under the same task and obstacle settings
+- [x] compare Pure Pursuit vs Rule Waypoint
 - [x] fast batch mode without animation delay
-- [x] success rate
-- [x] collision rate
-- [x] average path length
-- [x] average simulated completion time
-- [x] average control tick count
-- [x] average cross-track error
-- [x] average failure / recovery counts
-- [x] 1–100 trials per controller from UI
-- [ ] deterministic seeded scenario randomization
-- [ ] CSV / JSON export of batch result
-- [ ] multi-scenario benchmark suite
+- [x] success / collision / distance / simulated time / control tick / CTE / failure / recovery metrics
+
+### v1.5 — Seeded Benchmark Suite
+- [x] deterministic seed input
+- [x] reproducible scenario generator
+- [x] randomized initial robot pose
+- [x] randomized pallet source
+- [x] randomized destination
+- [x] randomized obstacle enable / pose / size
+- [x] identical scenario set for every controller
+- [x] multi-scenario benchmark runner
+- [x] scenario metadata retained in detailed results
+- [x] benchmark JSON export
+- [x] benchmark CSV summary export
+- [x] 1–50 scenarios from UI
+- [ ] predefined benchmark difficulty sets (easy / medium / hard)
+- [ ] final-position error metric
+
+### v1.6 — PID baseline / migration gate
+- [ ] PID steering controller
+- [ ] controller selector: Rule / Pure Pursuit / PID
+- [ ] seeded benchmark comparison across all three
+- [ ] tune PID gains from UI
+- [ ] document migration-ready interfaces
 
 ## Phase 1 — Cloudflare + OpenAI Planner
 - [ ] Move deployment from GitHub Pages to Cloudflare Pages
