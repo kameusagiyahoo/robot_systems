@@ -2,7 +2,7 @@
 
 物流フォークリフトを題材に、**Task → Planner → Skill → Policy → Robot → Environment** の階層構造を段階的に研究するための実験基盤です。
 
-現在は **GitHub Pagesで動く完全静的なv0** です。OpenAI APIなどの秘密情報はまだ使いません。
+現在は **GitHub Pagesで動く完全静的なv0.9** です。OpenAI APIなどの秘密情報はまだ使いません。
 
 ## Current features
 
@@ -10,32 +10,57 @@
 - forklift / pallet / storage / shipping visualization
 - smartphone-friendly web UI
 - Rule Planner
-- reusable Skill queue
+- state-driven Agent loop: Observe → Decide → Execute → Observe
+- reusable Skill contracts with preconditions / postconditions
+- replaceable `PolicyInterface` + `RulePolicy`
+- `RobotInterface` + `SimRobot`
+- failure laboratory: blocked path / detection / alignment / insertion failures
+- failure-aware replanning: retry / recovery / alternate route / abort
 - Step / Run / Reset
-- Agent Log
+- Agent Log / Decision History
 - Robot / Agent State inspector
-- `RobotInterface` abstraction for future SimRobot → PiRobot → ForkliftRobot replacement
-
-## Run
-
-静的ファイルだけなので `index.html` をWebサーバーから配信すれば動作します。GitHub Pagesにもそのまま配置できます。
+- Episode logging: Observation / Action / Result / Next Observation
+- episode metrics: steps / failures / recoveries / success
+- browser JSON export for later research-data conversion
 
 ## Architecture
 
 ```text
 Human Task
    ↓
+Task validation
+   ↓
 Planner          Rule now → OpenAI later
    ↓
-Skill            Navigate / Align / Insert / Lift / Place ...
+Skill contract   Preconditions / Postconditions
    ↓
-Policy           Rules now → PID/MPC/IL/RL/VLA later
+Policy           Rule now → PID/MPC/IL/RL/VLA later
    ↓
 RobotInterface
    ↓
 SimRobot         → PiRobot/ROS2 → ForkliftRobot
    ↓
 Environment
+   ↑
+Observation / Result feedback
+```
+
+## Research migration path
+
+```text
+GitHub Pages + Rule Planner
+↓
+Cloudflare + OpenAI Planner
+↓
+Camera / Detection / Pose / Visual Servo
+↓
+Raspberry Pi + ROS2
+↓
+LeRobot dataset / imitation learning
+↓
+Workstation GPU / VLA / World Model experiments
+↓
+Controlled real-forklift validation
 ```
 
 ## Documents
