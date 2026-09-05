@@ -11,6 +11,8 @@ export class SkillLearningPlugin{
   getEvaluationParameters(){return[]}
   getEvaluationMetrics(){return[{key:'successRate',label:'成功率',format:'percent',primary:true,better:'higher',goodThreshold:.8}]}
   getVisualizations(){return[]}
+  getRuntimePolicyAdapter(){return null}
+  getEvaluationScenarioAdapter(){return null}
   getNote(){return''}
   async train(){throw new Error(`training_not_supported:${this.id}`)}
   async evaluate(skillId,{defaultEvaluator,options={}}={}){
@@ -18,7 +20,7 @@ export class SkillLearningPlugin{
     return defaultEvaluator(skillId,options);
   }
   describe(skillId){
-    const evaluationMetrics=this.getEvaluationMetrics(skillId);
+    const evaluationMetrics=this.getEvaluationMetrics(skillId),runtimeAdapter=this.getRuntimePolicyAdapter(skillId),scenarioAdapter=this.getEvaluationScenarioAdapter(skillId);
     return{
       pluginId:this.id,
       pluginLabel:this.label,
@@ -31,6 +33,8 @@ export class SkillLearningPlugin{
       evaluationMetrics,
       primaryEvaluationMetric:evaluationMetrics.find(m=>m.primary)||evaluationMetrics[0]||null,
       visualizations:this.getVisualizations(skillId),
+      runtimePolicyAdapter:runtimeAdapter?.describe?.(skillId)||null,
+      evaluationScenarioAdapter:scenarioAdapter?.describe?.(skillId)||null,
       note:this.getNote(skillId)
     };
   }
@@ -47,5 +51,7 @@ export class DescriptorOnlyLearningPlugin extends SkillLearningPlugin{
   getEvaluationParameters(skillId){return this.value('evaluationParameters',skillId,[])}
   getEvaluationMetrics(skillId){return this.value('evaluationMetrics',skillId,super.getEvaluationMetrics(skillId))}
   getVisualizations(skillId){return this.value('visualizations',skillId,[])}
+  getRuntimePolicyAdapter(skillId){return this.value('runtimePolicyAdapter',skillId,null)}
+  getEvaluationScenarioAdapter(skillId){return this.value('evaluationScenarioAdapter',skillId,null)}
   getNote(skillId){return this.value('note',skillId,'')}
 }
