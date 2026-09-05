@@ -2,6 +2,7 @@ import '../plugins/default_skill_plugins.js';
 import {SKILL_LEARNING_REGISTRY,getSkillDefinition,skillLearningState,loadDatasetMeta,saveDatasetMeta,latestEvaluationForPolicy,clearSkillModel,setSelectedPolicy,selectedPolicy} from '../skill_learning_registry.js';
 import {getLearningPlugin,getLearningDescriptor} from '../framework/plugin_registry.js';
 import {renderLearningVisualizations} from '../framework/visualization_renderer.js';
+import {exportSkillLearningPackage,importSkillLearningPackage} from '../framework/skill_package.js';
 
 const $=s=>document.querySelector(s),params=new URLSearchParams(location.search);
 let skillId=params.get('skill')||'align_to_pallet';
@@ -9,6 +10,7 @@ if(!getSkillDefinition(skillId))skillId='align_to_pallet';
 const def=getSkillDefinition(skillId),plugin=getLearningPlugin(skillId),descriptor=getLearningDescriptor(skillId),datasetAdapter=plugin.getDatasetAdapter?.(skillId)||null,demoRecorder=plugin.getDemonstrationRecorderAdapter?.(skillId)||null,trainingBackend=plugin.getTrainingBackend?.(skillId)||null;
 const pct=v=>Number.isFinite(v)?`${(v*100).toFixed(0)}%`:'-';
 const fmtLoss=v=>Number.isFinite(Number(v))?Number(v).toFixed(4):'-';
+let trainingAbortController=null;
 
 function renderParameterInputs(){
   const host=$('#trainingParameters');host.innerHTML='';
@@ -71,32 +73,44 @@ function render(){
   const schema=descriptor.datasetSchema;$('#datasetSchema').textContent=schema?`${schema.type} · ${(schema.observation||[]).join(', ')}`:'未定義';
   $('#datasetState').textContent=dataset?`${dataset.samples||'?'} samples · ${dataset.kind||'dataset'}`:(descriptor.capabilities.trainable?'未生成':'対象外');
   $('#modelState').textContent=state.model?`${state.model.algorithm||'model'} · ${state.model.samples||'?'} samples`:(descriptor.capabilities.trainable?'未学習':'なし');
+  $('#modelIdState').textContent=state.model?.modelId|| (state.model?'legacy model / 次回学習でID付与':'-');
   $('#trainingState').textContent=state.model?`loss ${fmtLoss(state.model.loss)} · ${String(state.model.trainedAt||'').slice(0,10)} · ${state.model.trainingBackendId||'backend?'}`:(descriptor.capabilities.trainable?'未学習':'対象外');
   $('#evaluationState').textContent=evaluation?`${policy} ${pct(evaluation.successRate)} · ${evaluation.trials} trials`:'現在Policyは未評価';
   $('#skillNote').textContent=`${def.note} ${descriptor.note||''}`;
   $('#evalLink').href=`./evaluate.html?skill=${encodeURIComponent(skillId)}`;
   const indicator=$('#learnIndicator');indicator.className='learn-indicator';
   if(!descriptor.capabilities.trainable){indicator.textContent='×';indicator.classList.add('blocked');$('#learnTitle').textContent='このPluginでは現在学習不可';$('#learnMessage').textContent='評価と将来の拡張点はPlugin定義から表示しています。';$('#trainBtn').disabled=true;$('#trainBtn').textContent='現在は学習できません'}
-  else if(state.model){indicator.textContent='✓';indicator.classList.add('ready');$('#learnTitle').textContent='学習済み';$('#learnMessage').textContent=descriptor.capabilities.runtimeLearning?'Plugin RuntimeでClassic / Learnedを切り替えて実行・比較できます。':'モデル保存済み。Runtime Adapterは未対応です。';$('#trainBtn').disabled=false;$('#trainBtn').textContent='もう一度学習'}
-  else{indicator.textContent='－';$('#learnTitle').textContent='未学習';$('#learnMessage').textContent=trainingBackend?.describe?.().kind==='web_worker'?'Web Workerで画面を止めずに学習します。':`${descriptor.pluginLabel} が学習処理を提供します。`;$('#trainBtn').disabled=false;$('#trainBtn').textContent='このSkillを学習'}
+  else if(state.model){indicator.textContent='✓';indicator.classList.add('ready');$('#learnTitle').textContent='学習済み';$('#learnMessage').textContent=descriptor.capabilities.runtimeLearning?'Plugin RuntimeでClassic / Learnedを切り替えて実行・比較できます。':'モデル保存済み。Runtime Adapterは未対応です。';$('#trainBtn').disabled=!!trainingAbortController;$('#trainBtn').textContent='もう一度学習'}
+  else{indicator.textContent='－';$('#learnTitle').textContent='未学習';$('#learnMessage').textContent=trainingBackend?.describe?.().kind==='web_worker'?'Web Workerで画面を止めずに学習します。':`${descriptor.pluginLabel} が学習処理を提供します。`;$('#trainBtn').disabled=!!trainingAbortController;$('#trainBtn').textContent='このSkillを学習'}
   syncDatasetSourceFromSavedData();renderPolicyButtons(state);renderDatasetTools();renderVisualizations(state,dataset);
 }
 
 renderParameterInputs();render();
 
 $('#trainBtn').onclick=()=>{
-  if(!descriptor.capabilities.trainable)return;
-  const btn=$('#trainBtn'),note=$('#trainingNote');btn.disabled=true;note.classList.remove('hidden');
+  if(!descriptor.capabilities.trainable||trainingAbortController)return;
+  const btn=$('#trainBtn'),note=$('#trainingNote'),cancel=$('#cancelTrainBtn');trainingAbortController=new AbortController();btn.disabled=true;note.classList.remove('hidden');cancel.classList.remove('hidden');
   const options=collectTrainingOptions();
   requestAnimationFrame(()=>setTimeout(async()=>{
     try{
-      await plugin.train(skillId,{...options,onProgress:e=>{note.textContent=e.label||'学習中...';if(Number.isFinite(e.progress))note.textContent+=` ${Math.round(e.progress*100)}%`}});
+      await plugin.train(skillId,{...options,signal:trainingAbortController.signal,onProgress:e=>{note.textContent=e.label||'学習中...';if(Number.isFinite(e.progress))note.textContent+=` ${Math.round(e.progress*100)}%`}});
       if(descriptor.capabilities.runtimeLearning)setSelectedPolicy(skillId,'learned');
-    }catch(error){note.textContent=`学習エラー: ${error?.message||error}`;return}
-    finally{btn.disabled=false}
-    note.classList.add('hidden');render();
+      note.textContent='学習完了';
+    }catch(error){
+      const code=error?.code||error?.message||String(error);
+      if(code==='training_cancelled')note.textContent='学習をキャンセルしました';
+      else if(code==='training_timeout')note.textContent='学習timeoutで停止しました';
+      else note.textContent=`学習エラー: ${error?.message||error}`;
+    }finally{
+      trainingAbortController=null;btn.disabled=false;cancel.classList.add('hidden');render();
+    }
   },30));
 };
+
+$('#cancelTrainBtn')?.addEventListener('click',()=>{
+  if(!trainingAbortController)return;
+  trainingAbortController.abort('training_cancelled');trainingBackend?.cancel?.('training_cancelled');
+});
 
 $('#datasetImportBtn')?.addEventListener('click',()=>$('#datasetImportInput')?.click());
 $('#datasetImportInput')?.addEventListener('change',async e=>{
@@ -105,13 +119,24 @@ $('#datasetImportInput')?.addEventListener('change',async e=>{
     const meta=await datasetAdapter.importDataset(skillId,await file.text());
     saveDatasetMeta(skillId,{kind:'manual_import',samples:meta.samples,importedAt:meta.importedAt,pluginId:descriptor.pluginId,datasetAdapterId:datasetAdapter.id,datasetAdapterVersion:datasetAdapter.version});
     const source=document.querySelector('[data-training-param="datasetSource"]');if(source)source.value='manual_import';
-    $('#datasetToolState').textContent=`Import完了: ${meta.samples} samples`;
-    render();
+    $('#datasetToolState').textContent=`Import完了: ${meta.samples} samples`;render();
   }catch(error){$('#datasetToolState').textContent=`Import error: ${error?.message||error}`}
   e.target.value='';
 });
 $('#datasetExportBtn')?.addEventListener('click',()=>{if(datasetAdapter)downloadJson(datasetAdapter.exportDataset(skillId,{format:'portable'}),`${skillId}_dataset.json`)});
 $('#lerobotExportBtn')?.addEventListener('click',()=>{if(datasetAdapter)downloadJson(datasetAdapter.exportDataset(skillId,{format:'lerobot_intermediate'}),`${skillId}_lerobot_intermediate.json`)});
+
+$('#packageExportBtn')?.addEventListener('click',async()=>{
+  try{const pkg=await exportSkillLearningPackage(skillId);downloadJson(pkg,`${skillId}_skill_learning_package.json`);$('#packageState').textContent=`Package Export完了 · checksum ${pkg.integrity.checksum.slice(0,12)}…`}
+  catch(error){$('#packageState').textContent=`Package Export error: ${error?.message||error}`}
+});
+$('#packageImportBtn')?.addEventListener('click',()=>$('#packageImportInput')?.click());
+$('#packageImportInput')?.addEventListener('change',async e=>{
+  const file=e.target.files?.[0];if(!file)return;
+  try{const result=await importSkillLearningPackage(skillId,await file.text());$('#packageState').textContent=`Package Import完了 · ${result.importedModelId||'modelなし'} · eval ${result.evaluations}件`;render()}
+  catch(error){$('#packageState').textContent=`Package Import error: ${error?.message||error}`}
+  e.target.value='';
+});
 
 $('#clearBtn').onclick=()=>{clearSkillModel(skillId);setSelectedPolicy(skillId,'classic');render()};
 $('#nextBtn').onclick=()=>{const i=SKILL_LEARNING_REGISTRY.findIndex(s=>s.id===skillId),next=SKILL_LEARNING_REGISTRY[(i+1)%SKILL_LEARNING_REGISTRY.length];location.href=`./learn.html?skill=${encodeURIComponent(next.id)}`};
