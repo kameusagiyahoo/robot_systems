@@ -13,6 +13,16 @@ export class RulePlanner{
     return {raw:text,source,destination,status:(text&&source&&destination)?'active':'invalid'};
   }
 
+  retryFailedSkill(state,failed,retries,limit=2){
+    if(retries>limit)return{type:'abort',reason:`retry_limit_exceeded:${failed}`};
+    if(failed==='navigate_to_pallet')return{type:'skill',recovery:true,skill:{name:'navigate_to_pallet',args:{palletId:state.task.source}}};
+    if(failed==='align_to_pallet')return{type:'skill',recovery:true,skill:{name:'align_to_pallet',args:{palletId:state.task.source}}};
+    if(failed==='navigate_to')return{type:'skill',recovery:true,skill:{name:'navigate_to',args:{locationId:state.task.destination}}};
+    if(failed==='retreat')return{type:'skill',recovery:true,skill:{name:'retreat',args:{}}};
+    if(failed==='reposition_for_detection')return{type:'skill',recovery:true,skill:{name:'reposition_for_detection',args:{}}};
+    return{type:'abort',reason:`motion_timeout:${failed||'unknown_skill'}`};
+  }
+
   recovery(state){
     const result=state.agent.lastResult;
     if(!result||result.ok)return null;
@@ -22,6 +32,11 @@ export class RulePlanner{
     if(reason==='path_blocked'){
       if(!state.agent.memory.alternateRoute)return{type:'skill',recovery:true,skill:{name:'avoid_obstacle',args:{}}};
       return{type:'abort',reason:'path_blocked_after_alternate_route'};
+    }
+    if(reason==='motion_timeout')return this.retryFailedSkill(state,failed,retries,2);
+    if(reason==='collision_detected'){
+      if(!state.agent.memory.alternateRoute)return{type:'skill',recovery:true,skill:{name:'avoid_obstacle',args:{}}};
+      return this.retryFailedSkill(state,failed,retries,1);
     }
     if(reason.includes('detection')||reason==='pallet_not_visible'){
       if(retries<=2)return{type:'skill',recovery:true,skill:{name:'reposition_for_detection',args:{}}};
@@ -41,7 +56,7 @@ export class RulePlanner{
 
   next(task,state){
     if(task.status==='invalid'||!task.source||!task.destination)return{type:'abort',reason:'invalid_task'};
-    const recovery=this.recovery(state); if(recovery)return recovery;
+    const recovery=this.recovery(state);if(recovery)return recovery;
     const pallet=state.pallets[task.source],destination=state.locations[task.destination],robot=state.robot;
     if(!pallet)return{type:'abort',reason:'pallet_not_found'};
     if(!destination)return{type:'abort',reason:'destination_not_found'};
