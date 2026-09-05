@@ -4,13 +4,14 @@
 
 学習方法を全Skillで統一しない。
 
-共通化するのは **学習の枠組み** だけで、Dataset / Algorithm / Training Backend / Runtime / Evaluation / Visualization はSkillごとのPluginが定義する。
+共通化するのは **学習の枠組み** だけで、Dataset / Demonstration Recording / Algorithm / Training Backend / Runtime / Evaluation / Visualization はSkillごとのPluginが定義する。
 
 ```text
 Task
   ↓
 Skill
   ├ Dataset Adapter
+  ├ Demonstration Recorder Adapter
   ├ Training Backend
   ├ Runtime Policy Adapter
   ├ Evaluation Scenario Adapter
@@ -30,10 +31,12 @@ Pluginは以下を提供できる。
   - trainable
   - evaluable
   - runtimeLearning
+  - demonstrationRecording
   - available policies
 - algorithms
 - dataset schema
 - Dataset Adapter
+- Demonstration Recorder Adapter
 - Training Backend
 - training parameters
 - evaluation parameters
@@ -50,7 +53,76 @@ Pluginは以下を提供できる。
 
 Skill IDとLearning Pluginを結び付ける。
 
-UI、Runtime Router、Skill Evaluatorは具体的なBC/YOLO/ACT等を直接知らず、Registry経由でPluginを取得する。
+UI、Runtime Router、Skill Evaluator、Demonstration Recorder UIは具体的なBC/YOLO/ACT等を直接知らず、Registry経由でPluginを取得する。
+
+## Demonstration Recorder Adapter
+
+`src/learning/framework/demonstration_recorder_adapter.js`
+
+手動操作などからDatasetを作るための拡張点。
+
+現在のMotion実装:
+
+`src/learning/plugins/motion_demonstration_recorder.js`
+
+流れ:
+
+```text
+Manual Control
+  ↓
+Skill-specific Demonstration Recorder Adapter
+  ↓
+Observation + Action samples
+  ↓
+Dataset Adapter
+  ↓
+Manual / Recorded Dataset
+  ↓
+Training Backend
+```
+
+Motion Recorderは以下のSkillに対応する。
+
+- NavigateToPallet
+- AlignToPallet
+- Transport
+- Retreat
+
+記録中は手動方向ボタンの長押しを約80ms周期でSamplingする。
+
+RecorderはSkillごとのRuntime入力表現に合わせてObservationを作る。
+
+現在のMotion observation/action:
+
+```text
+Observation
+- dx
+- dy
+- yawError
+- speed
+- steeringAngle
+
+Action
+- speed
+- steeringAngle
+```
+
+記録停止時にまとめてMotion Dataset Adapterへ保存する。
+
+将来の例:
+
+```text
+DetectPallet
+→ Image Annotation Recorder
+
+InsertFork
+→ Camera / Depth / Robot State / Action Trajectory Recorder
+
+VLA
+→ multimodal episode recorder
+```
+
+Recorder方式もSkill Pluginごとに異なってよい。
 
 ## Training Backend
 
@@ -98,6 +170,7 @@ Datasetの作り方をAlgorithm/UIから分離する。
 
 - `synthetic_expert`
 - `manual_import`
+- manual recorded demonstration
 - observation/action JSON import
 - portable JSON export
 - LeRobot変換用 intermediate JSON export
@@ -177,8 +250,10 @@ Episode metaにはSkillごとに以下を保存する。
 - selected Policy
 - Runtime Adapter
 - Evaluation Scenario Adapter
+- Dataset Adapter
+- Demonstration Recorder Adapter
+- Training Backend
 - Model algorithm / version / trainedAt / samples / epochs / loss
-- Training Backend ID / version
 - Dataset source / Adapter ID / version
 
 モデル重みそのものはEpisodeへ複製しない。
@@ -205,7 +280,8 @@ Episode metaにはSkillごとに以下を保存する。
 現在:
 
 - Dataset Adapter: Motion observation/action
-- Dataset: synthetic expert / imported manual demo
+- Demonstration Recorder: manual simulator operation
+- Dataset: synthetic expert / recorded or imported manual demo
 - Algorithm: Behavior Cloning
 - Training Backend: Web Worker
 - Runtime Adapter: Motion BC Runtime
@@ -227,6 +303,7 @@ Episode metaにはSkillごとに以下を保存する。
 将来:
 
 - RGB / Depth dataset adapter
+- image annotation recorder
 - Detector / Segmentation / VLM
 - perception runtime adapter
 - camera-specific evaluation scenario
@@ -244,6 +321,7 @@ Episode metaにはSkillごとに以下を保存する。
 将来:
 
 - trajectory dataset adapter
+- trajectory demonstration recorder
 - BC / ACT / Diffusion Policy / RL
 - manipulation runtime adapter
 - physics/contact evaluation scenario
@@ -261,12 +339,12 @@ Plugin Descriptor
   ↓
 UI builds controls dynamically
   ↓
-Dataset Adapter / Training Backend / Plugin train/evaluate
+Dataset / Recorder / Training / Runtime / Evaluation adapters
   ↓
-Plugin-defined runtime / scenario / visualizations / metrics
+Plugin-defined visualizations / metrics
 ```
 
-新しいPluginでTraining ParameterやEvaluation Metricが変わっても、基本的にページ本体を変更しない。
+新しいPluginでTraining ParameterやEvaluation Metric、Recorder方式が変わっても、基本的に共通ページ本体を変更しない。
 
 ## Visualization framework
 
@@ -296,7 +374,7 @@ Manipulation Pluginなら:
 ## Important principle
 
 > Skill Learning Framework は共通。
-> Dataset / Algorithm / Training Backend / Runtime / Evaluation / Visualization はSkill Pluginごとに異なってよい。
+> Dataset / Demonstration Recording / Algorithm / Training Backend / Runtime / Evaluation / Visualization はSkill Pluginごとに異なってよい。
 
 「全SkillをBehavior Cloningにする」「全SkillでLoss graphを出す」といった設計にはしない。
 
@@ -315,14 +393,17 @@ Manipulation Pluginなら:
 - [x] Dataset Adapter interface
 - [x] Manual observation/action JSON import
 - [x] LeRobot conversion用 intermediate JSON export
-- [x] Plugin/Policy/Model/Dataset metadataをEpisodeへ保存
+- [x] Demonstration Recorder Adapter interface
+- [x] Motion Skill manual demonstration recorder
+- [x] long-press manual control sampling
+- [x] Plugin/Policy/Model/Dataset/Recorder metadataをEpisodeへ保存
 - [x] Domain Service interface
 
 ## Next framework tasks
 
-- [ ] 実際の手動操作からSkill-specific demonstrationを記録するRecorder
 - [ ] 公式LeRobotDatasetへのconverter / importer
 - [ ] Visualization Rendererのplugin-local registrationを強化
 - [ ] Plugin単位のimport/export package形式を定義
 - [ ] Worker cancellation / timeout
 - [ ] Model ID / checksumを付与して実験再現性をさらに上げる
+- [ ] demonstration episode boundaries / quality labels / DAgger support
