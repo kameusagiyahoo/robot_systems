@@ -6,7 +6,7 @@ import {renderLearningVisualizations} from '../framework/visualization_renderer.
 const $=s=>document.querySelector(s),params=new URLSearchParams(location.search);
 let skillId=params.get('skill')||'align_to_pallet';
 if(!getSkillDefinition(skillId))skillId='align_to_pallet';
-const def=getSkillDefinition(skillId),plugin=getLearningPlugin(skillId),descriptor=getLearningDescriptor(skillId),datasetAdapter=plugin.getDatasetAdapter?.(skillId)||null,trainingBackend=plugin.getTrainingBackend?.(skillId)||null;
+const def=getSkillDefinition(skillId),plugin=getLearningPlugin(skillId),descriptor=getLearningDescriptor(skillId),datasetAdapter=plugin.getDatasetAdapter?.(skillId)||null,demoRecorder=plugin.getDemonstrationRecorderAdapter?.(skillId)||null,trainingBackend=plugin.getTrainingBackend?.(skillId)||null;
 const pct=v=>Number.isFinite(v)?`${(v*100).toFixed(0)}%`:'-';
 const fmtLoss=v=>Number.isFinite(Number(v))?Number(v).toFixed(4):'-';
 
@@ -22,6 +22,12 @@ function renderParameterInputs(){
     }else{input=document.createElement('input');input.type=p.type||'text';if(p.min!==undefined)input.min=p.min;if(p.max!==undefined)input.max=p.max;if(p.step!==undefined)input.step=p.step}
     input.dataset.trainingParam=p.key;if(p.default!==undefined)input.value=p.default;label.appendChild(input);host.appendChild(label);
   }
+  syncDatasetSourceFromSavedData();
+}
+
+function syncDatasetSourceFromSavedData(){
+  const source=document.querySelector('[data-training-param="datasetSource"]'),dataset=loadDatasetMeta(skillId),manualCount=datasetAdapter?.describe?.(skillId)?.manualSamples||0;
+  if(source&&manualCount>0&&['manual_import','manual_recorded'].includes(dataset?.kind))source.value='manual_import';
 }
 
 function collectTrainingOptions(){
@@ -48,17 +54,18 @@ function renderDatasetTools(){
   if(!datasetAdapter){card.classList.add('hidden');return}
   card.classList.remove('hidden');
   const info=datasetAdapter.describe?.(skillId)||{};
-  $('#datasetToolState').textContent=`${info.label||datasetAdapter.id} / imported manual samples: ${info.manualSamples??0}. LeRobot中間JSONは公式LeRobotDatasetそのものではなく、後段変換用の中間形式です。`;
+  $('#datasetToolState').textContent=`${info.label||datasetAdapter.id} / recorded or imported manual samples: ${info.manualSamples??0}. LeRobot中間JSONは公式LeRobotDatasetそのものではなく、後段変換用の中間形式です。`;
 }
 
 function render(){
-  const state=skillLearningState(skillId),dataset=loadDatasetMeta(skillId),policy=selectedPolicy(skillId),evaluation=latestEvaluationForPolicy(skillId,policy)||state.evaluation,adapterInfo=datasetAdapter?.describe?.(skillId)||descriptor.datasetAdapter;
+  const state=skillLearningState(skillId),dataset=loadDatasetMeta(skillId),policy=selectedPolicy(skillId),evaluation=latestEvaluationForPolicy(skillId,policy)||state.evaluation,adapterInfo=datasetAdapter?.describe?.(skillId)||descriptor.datasetAdapter,recorderInfo=demoRecorder?.describe?.(skillId)||descriptor.demonstrationRecorderAdapter;
   $('#skillTitle').textContent=`${def.code} / ${def.label}`;$('#skillDesc').textContent=def.desc;$('#skillNumber').textContent=`${def.order} / ${SKILL_LEARNING_REGISTRY.length}`;
   $('#pluginState').textContent=`${descriptor.pluginLabel} v${descriptor.pluginVersion}`;
   $('#runtimeAdapterState').textContent=descriptor.runtimePolicyAdapter?`${descriptor.runtimePolicyAdapter.label} v${descriptor.runtimePolicyAdapter.version}`:'Classic Runtimeのみ';
   $('#scenarioAdapterState').textContent=descriptor.evaluationScenarioAdapter?`${descriptor.evaluationScenarioAdapter.label} v${descriptor.evaluationScenarioAdapter.version}`:'未定義';
   $('#trainingBackendState').textContent=trainingBackend?`${trainingBackend.label} v${trainingBackend.version}`:'Plugin内実行 / 未定義';
   $('#datasetAdapterState').textContent=adapterInfo?`${adapterInfo.label} v${adapterInfo.version}`:'未定義';
+  $('#demoRecorderState').textContent=recorderInfo?`${recorderInfo.label} v${recorderInfo.version}`:'未定義';
   $('#policyState').textContent=policy==='learned'?'Learned Policy':'Classic Policy';
   $('#algorithmState').textContent=(descriptor.algorithms||[]).map(a=>a.label).join(' / ')||'なし';
   const schema=descriptor.datasetSchema;$('#datasetSchema').textContent=schema?`${schema.type} · ${(schema.observation||[]).join(', ')}`:'未定義';
@@ -72,7 +79,7 @@ function render(){
   if(!descriptor.capabilities.trainable){indicator.textContent='×';indicator.classList.add('blocked');$('#learnTitle').textContent='このPluginでは現在学習不可';$('#learnMessage').textContent='評価と将来の拡張点はPlugin定義から表示しています。';$('#trainBtn').disabled=true;$('#trainBtn').textContent='現在は学習できません'}
   else if(state.model){indicator.textContent='✓';indicator.classList.add('ready');$('#learnTitle').textContent='学習済み';$('#learnMessage').textContent=descriptor.capabilities.runtimeLearning?'Plugin RuntimeでClassic / Learnedを切り替えて実行・比較できます。':'モデル保存済み。Runtime Adapterは未対応です。';$('#trainBtn').disabled=false;$('#trainBtn').textContent='もう一度学習'}
   else{indicator.textContent='－';$('#learnTitle').textContent='未学習';$('#learnMessage').textContent=trainingBackend?.describe?.().kind==='web_worker'?'Web Workerで画面を止めずに学習します。':`${descriptor.pluginLabel} が学習処理を提供します。`;$('#trainBtn').disabled=false;$('#trainBtn').textContent='このSkillを学習'}
-  renderPolicyButtons(state);renderDatasetTools();renderVisualizations(state,dataset);
+  syncDatasetSourceFromSavedData();renderPolicyButtons(state);renderDatasetTools();renderVisualizations(state,dataset);
 }
 
 renderParameterInputs();render();
@@ -108,3 +115,4 @@ $('#lerobotExportBtn')?.addEventListener('click',()=>{if(datasetAdapter)download
 
 $('#clearBtn').onclick=()=>{clearSkillModel(skillId);setSelectedPolicy(skillId,'classic');render()};
 $('#nextBtn').onclick=()=>{const i=SKILL_LEARNING_REGISTRY.findIndex(s=>s.id===skillId),next=SKILL_LEARNING_REGISTRY[(i+1)%SKILL_LEARNING_REGISTRY.length];location.href=`./learn.html?skill=${encodeURIComponent(next.id)}`};
+window.addEventListener('storage',render);
