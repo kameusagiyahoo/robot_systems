@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>Skill Learning v1.9</title>
+  <title>Skill Learning v2.0</title>
   <link rel="stylesheet" href="./style.css">
   <style>
     body{min-height:100dvh;overflow:hidden;background:#eef2f5}.learn-screen{height:100dvh;display:grid;grid-template-rows:auto 1fr auto;max-width:760px;margin:auto}.learn-top{padding:9px 11px;background:#17202a;color:#fff;display:flex;align-items:center;justify-content:space-between}.learn-top strong{font-size:.95rem}.learn-top span{font-size:.68rem;opacity:.65}.back-link{color:#fff;text-decoration:none;font-weight:800;font-size:.75rem;border:1px solid rgba(255,255,255,.24);border-radius:8px;padding:6px 8px}.learn-main{min-height:0;padding:7px;display:grid;grid-template-rows:auto auto 1fr;gap:7px;overflow:hidden}.skill-focus,.learn-status,.learning-grid{background:#fff;border:1px solid #dce4e9;border-radius:11px;padding:10px}.skill-focus{display:flex;justify-content:space-between;gap:8px;align-items:center}.skill-focus small{display:block;font-size:.62rem;color:#71808a;font-weight:800}.skill-focus h1{font-size:1rem;margin:1px 0}.skill-focus p{font-size:.68rem;margin:0;color:#66737c}.skill-number{font-size:.68rem;font-weight:900;background:#edf2f5;border-radius:999px;padding:5px 7px}.learn-status{display:grid;grid-template-columns:auto 1fr;gap:9px;align-items:center}.learn-indicator{width:43px;height:43px;border-radius:50%;display:grid;place-items:center;font-weight:900;background:#edf1f4;color:#66737c}.learn-indicator.ready{background:#dff2e6;color:#176b3b}.learn-indicator.blocked{background:#fff0ee;color:#a11d14}.learn-status h2{font-size:.92rem;margin:0}.learn-status p{font-size:.69rem;margin:2px 0;color:#6b7780}.learning-grid{min-height:0;overflow:auto;display:grid;grid-template-columns:1fr 1fr;gap:7px}.learning-item{background:#f7f9fb;border-radius:9px;padding:8px;min-width:0}.learning-item span{display:block;font-size:.6rem;color:#7b8790;font-weight:800}.learning-item strong{display:block;font-size:.72rem;margin-top:2px;overflow-wrap:anywhere}.learning-item.full{grid-column:1/-1}.learning-note{font-size:.67rem!important;line-height:1.35;margin:0!important;color:#53636e!important}.policy-buttons{display:flex;gap:6px;margin-top:6px}.policy-buttons button{min-height:32px;padding:5px 8px;font-size:.68rem}.policy-buttons button.active{background:#17202a;color:#fff}.learn-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:7px max(7px,env(safe-area-inset-right)) calc(7px + env(safe-area-inset-bottom)) max(7px,env(safe-area-inset-left));background:#fff;border-top:1px solid #dce4e9}.learn-actions button,.learn-actions a{min-height:42px;font-size:.76rem}.learn-actions .primary-action{background:#17202a;color:#fff;border-color:#17202a}.learn-actions .eval-link{background:#245b89;color:#fff;border-radius:9px;text-decoration:none;display:flex;align-items:center;justify-content:center;font-weight:850}.learn-actions .go-main{background:#197a43;color:#fff;border:1px solid #197a43;border-radius:9px;text-decoration:none;display:flex;align-items:center;justify-content:center;font-weight:850}.hidden{display:none!important}.training-note{font-size:.66rem;color:#9a6700;font-weight:800;margin-top:3px}@media(min-width:700px){body{overflow:auto}.learn-screen{height:auto;min-height:100dvh}.learn-main{overflow:visible}.learning-grid{overflow:visible}}
@@ -11,7 +11,7 @@
 </head>
 <body>
 <div class="learn-screen">
-  <header class="learn-top"><div><strong>Skill Learning</strong> <span>v1.9</span></div><a class="back-link" href="./index.html">← Task</a></header>
+  <header class="learn-top"><div><strong>Skill Learning</strong> <span>v2.0</span></div><a class="back-link" href="./index.html">← Task</a></header>
   <main class="learn-main">
     <section class="skill-focus"><div><small>Task Pipeline / Skill</small><h1 id="skillTitle">読み込み中...</h1><p id="skillDesc"></p></div><div id="skillNumber" class="skill-number">- / 8</div></section>
     <section class="learn-status"><div id="learnIndicator" class="learn-indicator">－</div><div><h2 id="learnTitle">確認中...</h2><p id="learnMessage"></p><div id="trainingNote" class="training-note hidden">学習中です。この画面のまま待ってください。</div></div></section>
@@ -25,29 +25,29 @@
       <div class="learning-item full"><span>このSkillについて</span><p id="skillNote" class="learning-note"></p></div>
     </section>
   </main>
-  <footer class="learn-actions"><button id="trainBtn" class="primary-action">このSkillを学習</button><a id="evalLink" class="eval-link" href="#">このSkillを評価</a><a class="go-main" href="./index.html">メインで確認</a><button id="nextBtn">次のSkill →</button><button id="clearBtn">モデル削除</button></footer>
+  <footer class="learn-actions"><button id="trainBtn" class="primary-action">このSkillを学習</button><a id="evalLink" class="eval-link" href="#">評価 / 比較</a><a class="go-main" href="./index.html">メインで確認</a><button id="nextBtn">次のSkill →</button><button id="clearBtn">モデル削除</button></footer>
 </div>
 <script type="module">
-import {SKILL_LEARNING_REGISTRY,getSkillDefinition,skillLearningState,loadDatasetMeta,loadSkillEvaluation,saveSkillModel,clearSkillModel,setSelectedPolicy,selectedPolicy} from './src/learning/skill_learning_registry.js';
+import {SKILL_LEARNING_REGISTRY,getSkillDefinition,skillLearningState,loadDatasetMeta,latestEvaluationForPolicy,saveSkillModel,clearSkillModel,setSelectedPolicy,selectedPolicy} from './src/learning/skill_learning_registry.js';
 import {BehaviorCloningSkill,generateSkillDemos} from './src/learning/behavior_cloning_skill.js';
 import {BehaviorCloningAlign,generateSyntheticDemos} from './src/learning/behavior_cloning_align.js';
 const $=s=>document.querySelector(s),params=new URLSearchParams(location.search);let skillId=params.get('skill')||'align_to_pallet';
 if(!getSkillDefinition(skillId))skillId='align_to_pallet';
-const def=getSkillDefinition(skillId);const pct=v=>Number.isFinite(v)?`${(v*100).toFixed(0)}%`:'-';
+const def=getSkillDefinition(skillId),pct=v=>Number.isFinite(v)?`${(v*100).toFixed(0)}%`:'-';
 function fmtLoss(v){return Number.isFinite(Number(v))?Number(v).toFixed(4):'-'}
 function render(){
-  const s=skillLearningState(skillId),dataset=loadDatasetMeta(skillId),model=s.model,policy=selectedPolicy(skillId),evaluation=loadSkillEvaluation(skillId);
+  const s=skillLearningState(skillId),dataset=loadDatasetMeta(skillId),model=s.model,policy=selectedPolicy(skillId),evaluation=latestEvaluationForPolicy(skillId,policy)||s.evaluation;
   $('#skillTitle').textContent=`${def.code} / ${def.label}`;$('#skillDesc').textContent=def.desc;$('#skillNumber').textContent=`${def.order} / ${SKILL_LEARNING_REGISTRY.length}`;
   $('#learningMethod').textContent=def.learning;$('#skillNote').textContent=def.note;$('#policyState').textContent=policy==='learned'?'Learned Policy':'Classic Policy';
   $('#datasetState').textContent=dataset?`${dataset.samples||'?'} samples · ${dataset.kind||'dataset'}`:(def.trainable?'未生成':'対象外');
   $('#modelState').textContent=model?`${model.algorithm||'model'} · ${model.samples||'?'} samples`:(def.trainable?'未学習':'なし');
   $('#trainingState').textContent=model?`loss ${fmtLoss(model.loss)} · ${String(model.trainedAt||'').slice(0,10)}`:(def.trainable?'未学習':'対象外');
-  $('#evaluationState').textContent=evaluation?`${pct(evaluation.successRate)} · ${evaluation.trials} trials`:'未実施';
+  $('#evaluationState').textContent=evaluation?`${policy} ${pct(evaluation.successRate)} · ${evaluation.trials} trials`:'現在Policyは未評価';
   $('#evalLink').href=`./evaluate.html?skill=${encodeURIComponent(skillId)}`;
   const indicator=$('#learnIndicator');indicator.className='learn-indicator';
   if(!def.trainable){indicator.textContent='×';indicator.classList.add('blocked');$('#learnTitle').textContent='現在は学習対象外';$('#learnMessage').textContent='学習は未対応ですが、このSkill単体のRuntime評価はできます。';$('#trainBtn').disabled=true;$('#trainBtn').textContent='現在は学習できません'}
-  else if(model){indicator.textContent='✓';indicator.classList.add('ready');$('#learnTitle').textContent='学習済み';$('#learnMessage').textContent=def.runtimeLearning?'Learned Policyへ切替して評価できます。':'モデル保存済み。Runtime評価では現在のClassic Policyを測定します。';$('#trainBtn').disabled=false;$('#trainBtn').textContent='もう一度学習'}
-  else{indicator.textContent='－';$('#learnTitle').textContent='未学習';$('#learnMessage').textContent='学習前でも現在のRuntime Policyを評価できます。';$('#trainBtn').disabled=false;$('#trainBtn').textContent='このSkillを学習'}
+  else if(model){indicator.textContent='✓';indicator.classList.add('ready');$('#learnTitle').textContent='学習済み';$('#learnMessage').textContent=def.runtimeLearning?'Classic / Learnedを切り替えて実行・比較できます。':'モデル保存済み。Runtime接続は未対応です。';$('#trainBtn').disabled=false;$('#trainBtn').textContent='もう一度学習'}
+  else{indicator.textContent='－';$('#learnTitle').textContent='未学習';$('#learnMessage').textContent='学習前のClassic Policyも先に評価できます。';$('#trainBtn').disabled=false;$('#trainBtn').textContent='このSkillを学習'}
   const pb=$('#policyButtons');pb.innerHTML='';
   const classic=document.createElement('button');classic.textContent='Classic';classic.className=policy==='classic'?'active':'';classic.onclick=()=>{setSelectedPolicy(skillId,'classic');render()};pb.appendChild(classic);
   const learned=document.createElement('button');learned.textContent='Learned';learned.disabled=!model||!def.runtimeLearning;learned.className=policy==='learned'?'active':'';learned.onclick=()=>{setSelectedPolicy(skillId,'learned');render()};pb.appendChild(learned);
@@ -57,11 +57,11 @@ $('#trainBtn').onclick=()=>{
   if(!def.trainable)return;$('#trainBtn').disabled=true;$('#trainingNote').classList.remove('hidden');
   requestAnimationFrame(()=>setTimeout(()=>{
     try{
-      let model;
       if(skillId==='align_to_pallet'){
-        const legacy=new BehaviorCloningAlign(),demos=generateSyntheticDemos(2500,42);model=legacy.train(demos);saveSkillModel(skillId,{...model,algorithm:'behavior_cloning'});
-        localStorage.setItem('forklift_skill_dataset_meta_v1:'+skillId,JSON.stringify({skillId,kind:'synthetic_expert',samples:demos.length,seed:42,generatedAt:new Date().toISOString()}));setSelectedPolicy(skillId,'learned');
-      }else{const demos=generateSkillDemos(skillId,2500,42),bc=new BehaviorCloningSkill(skillId);model=bc.train(demos)}
+        const legacy=new BehaviorCloningAlign(),demos=generateSyntheticDemos(2500,42),model=legacy.train(demos);saveSkillModel(skillId,{...model,algorithm:'behavior_cloning'});
+        localStorage.setItem('forklift_skill_dataset_meta_v1:'+skillId,JSON.stringify({skillId,kind:'synthetic_expert',samples:demos.length,seed:42,generatedAt:new Date().toISOString()}));
+      }else{const demos=generateSkillDemos(skillId,2500,42),bc=new BehaviorCloningSkill(skillId);bc.train(demos)}
+      if(def.runtimeLearning)setSelectedPolicy(skillId,'learned');
     }finally{$('#trainingNote').classList.add('hidden');render()}
   },30));
 };
