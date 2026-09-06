@@ -6,6 +6,7 @@ from pathlib import Path
 
 from bridges.gazebo.gazebo_ros2_backend import GazeboRos2ForkliftBackend
 from bridges.python.http_server import create_app
+from bridges.python.perception_inference import HttpPerceptionInferenceProvider, PerceptionEnabledBackend
 
 
 def _load_world():
@@ -17,7 +18,7 @@ def _load_world():
 
 def build_backend():
     world = _load_world()
-    return GazeboRos2ForkliftBackend(
+    backend = GazeboRos2ForkliftBackend(
         world_name=os.environ.get("GAZEBO_WORLD", "default"),
         robot_entity=os.environ.get("GAZEBO_ROBOT_ENTITY", "forklift"),
         pallet_entities=world.get("palletEntities") or {},
@@ -39,6 +40,15 @@ def build_backend():
         max_reverse_speed=float(os.environ.get("ROBOT_MAX_REVERSE_SPEED", "1.0")),
         max_steering_angle_deg=float(os.environ.get("ROBOT_MAX_STEERING_DEG", "35")),
     )
+    perception_url = os.environ.get("ROBOT_SYSTEMS_PERCEPTION_URL", "").strip()
+    if perception_url:
+        provider = HttpPerceptionInferenceProvider(
+            perception_url,
+            token=os.environ.get("ROBOT_SYSTEMS_PERCEPTION_TOKEN") or None,
+            timeout=float(os.environ.get("ROBOT_SYSTEMS_PERCEPTION_TIMEOUT", "15")),
+        )
+        return PerceptionEnabledBackend(backend, provider)
+    return backend
 
 
 backend = build_backend()
