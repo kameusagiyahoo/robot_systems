@@ -8,6 +8,8 @@ import {MotionDatasetAdapter} from './motion_dataset_adapter.js';
 import {MotionBcTrainingBackend} from './motion_bc_training_backend.js';
 import {MotionDemonstrationRecorderAdapter} from './motion_demonstration_recorder.js';
 import {motionSkillIOAdapter} from './motion_skill_io_adapter.js';
+import {perceptionSensorSource} from './perception_sensor_source.js';
+import {perceptionInferenceBackend} from './perception_inference_backend.js';
 
 const MOTION_SKILLS=['navigate_to_pallet','align_to_pallet','navigate_to','retreat'];
 const metric=(key,label,format='number',unit='',extra={})=>({key,label,format,unit,...extra});
@@ -50,7 +52,21 @@ class MotionBehaviorCloningPlugin extends SkillLearningPlugin{
   }
 }
 
-const perceptionPlugin=new DescriptorOnlyLearningPlugin({id:'perception_future',label:'Perception Learning Adapter',version:8,skills:['detect_pallet'],descriptor:{capabilities:{trainable:false,evaluable:true,runtimeLearning:false,demonstrationRecording:false,policies:['classic']},algorithms:[{id:'detector',label:'Detector / Segmentation / VLM',kind:'perception'}],datasetSchema:{type:'image_annotation',observation:['rgb','depth?'],target:['bbox','mask','keypoints','pose']},trainingParameters:[],evaluationParameters:[{key:'trials',label:'Trials',type:'number',default:20,min:1,max:100,step:1},{key:'seed',label:'Seed',type:'number',default:42,step:1}],evaluationMetrics:[successMetric(),metric('avgControlTicks','処理Step','integer','',{better:'lower'})],evaluationScenarioAdapter:perceptionScenarioAdapter,visualizations:[{id:'detection_examples',type:'capability_note',title:'将来の可視化',text:'検出画像 / PR Curve / Confusion Matrix / Pose Error'}],note:'Camera観測を追加したときに、画像Dataset・Annotation Recorder・Perception I/O Adapter・Detector/VLM学習・知覚Runtimeへ差し替えます。'}});
+const perceptionPlugin=new DescriptorOnlyLearningPlugin({
+  id:'perception_future',label:'Perception Sensor Framework',version:9,skills:['detect_pallet'],descriptor:{
+    capabilities:{trainable:false,evaluable:true,runtimeLearning:false,demonstrationRecording:false,sensorDriven:true,environmentSensorSource:true,inferencePluggable:true,policies:['classic']},
+    algorithms:[{id:'detector',label:'Detector / Segmentation / VLM / Pose Estimator',kind:'perception'}],
+    datasetSchema:{type:'sensor_annotation',observation:['rgb?','depth?','lidar?'],target:['bbox?','mask?','keypoints?','pose?','class']},
+    sensorSourceAdapter:perceptionSensorSource,
+    inferenceBackend:perceptionInferenceBackend,
+    trainingParameters:[],
+    evaluationParameters:[{key:'trials',label:'Trials',type:'number',default:20,min:1,max:100,step:1},{key:'seed',label:'Seed',type:'number',default:42,step:1}],
+    evaluationMetrics:[successMetric(),metric('avgControlTicks','処理Step','integer','',{better:'lower'})],
+    evaluationScenarioAdapter:perceptionScenarioAdapter,
+    visualizations:[{id:'detection_examples',type:'capability_note',title:'Perception Visualization',text:'Sensor source / Detector backend / 検出結果の枠を実装済み。実Model接続後に検出画像・PR Curve・Confusion Matrix・Pose Errorを追加します。'}],
+    note:'Sensor Source Adapter と Inference Backend はFramework化済みです。Browser2Dの近接判定はSmoke Test専用。Gazebo/実機ではRGB/Depth/LiDARまたは perception.infer Serviceを使い、真値座標を実認識性能として扱いません。'
+  }
+});
 const manipulationPlugin=new DescriptorOnlyLearningPlugin({id:'manipulation_future',label:'Manipulation Learning Adapter',version:8,skills:['insert_forks','lift','place'],descriptor:{capabilities:{trainable:false,evaluable:true,runtimeLearning:false,demonstrationRecording:false,policies:['classic']},algorithms:[{id:'sequence_policy',label:'BC / ACT / Diffusion Policy / RL',kind:'manipulation'}],datasetSchema:{type:'trajectory',observation:['robot_state','fork_state','camera?','depth?'],action:['fork','speed','steering']},trainingParameters:[],evaluationParameters:[{key:'trials',label:'Trials',type:'number',default:20,min:1,max:100,step:1},{key:'seed',label:'Seed',type:'number',default:42,step:1}],evaluationMetrics:[successMetric(),metric('avgControlTicks','平均制御Step','integer','',{better:'lower'})],evaluationScenarioAdapter:manipulationScenarioAdapter,visualizations:[{id:'manipulation_future',type:'capability_note',title:'将来の可視化',text:'Action系列 / 接触位置 / 3D軌跡 / 成功・失敗リプレイ'}],note:'現在の2D Smoke Testでは操作が瞬時状態遷移です。高忠実度Environmentで物理自由度を追加後、Manipulation I/O Adapterを含め具体実装します。'}});
 
 registerLearningPlugin(new MotionBehaviorCloningPlugin(),{skills:MOTION_SKILLS});registerLearningPlugin(perceptionPlugin,{skills:['detect_pallet']});registerLearningPlugin(manipulationPlugin,{skills:['insert_forks','lift','place']});
