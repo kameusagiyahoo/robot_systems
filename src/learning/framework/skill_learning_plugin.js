@@ -7,6 +7,7 @@ export class SkillLearningPlugin{
   getCapabilities(){return{trainable:false,evaluable:true,runtimeLearning:false,policies:['classic']}}
   getAlgorithms(){return[]}
   getDatasetSchema(){return null}
+  getSkillIOAdapter(){return null}
   getDatasetAdapter(){return null}
   getDemonstrationRecorderAdapter(){return null}
   getTrainingBackend(){return null}
@@ -23,7 +24,7 @@ export class SkillLearningPlugin{
     return defaultEvaluator(skillId,options);
   }
   describe(skillId){
-    const evaluationMetrics=this.getEvaluationMetrics(skillId),runtimeAdapter=this.getRuntimePolicyAdapter(skillId),scenarioAdapter=this.getEvaluationScenarioAdapter(skillId),datasetAdapter=this.getDatasetAdapter(skillId),recorderAdapter=this.getDemonstrationRecorderAdapter(skillId),trainingBackend=this.getTrainingBackend(skillId);
+    const evaluationMetrics=this.getEvaluationMetrics(skillId),ioAdapter=this.getSkillIOAdapter(skillId),runtimeAdapter=this.getRuntimePolicyAdapter(skillId),scenarioAdapter=this.getEvaluationScenarioAdapter(skillId),datasetAdapter=this.getDatasetAdapter(skillId),recorderAdapter=this.getDemonstrationRecorderAdapter(skillId),trainingBackend=this.getTrainingBackend(skillId);
     return{
       pluginId:this.id,
       pluginLabel:this.label,
@@ -31,6 +32,7 @@ export class SkillLearningPlugin{
       capabilities:this.getCapabilities(skillId),
       algorithms:this.getAlgorithms(skillId),
       datasetSchema:this.getDatasetSchema(skillId),
+      skillIOAdapter:ioAdapter?.describe?.(skillId)||null,
       datasetAdapter:datasetAdapter?.describe?.(skillId)||null,
       demonstrationRecorderAdapter:recorderAdapter?.describe?.(skillId)||null,
       trainingBackend:trainingBackend?.describe?.(skillId)||null,
@@ -53,6 +55,7 @@ export class DescriptorOnlyLearningPlugin extends SkillLearningPlugin{
   getCapabilities(skillId){return this.value('capabilities',skillId,super.getCapabilities(skillId))}
   getAlgorithms(skillId){return this.value('algorithms',skillId,[])}
   getDatasetSchema(skillId){return this.value('datasetSchema',skillId,null)}
+  getSkillIOAdapter(skillId){return this.value('skillIOAdapter',skillId,null)}
   getDatasetAdapter(skillId){return this.value('datasetAdapter',skillId,null)}
   getDemonstrationRecorderAdapter(skillId){return this.value('demonstrationRecorderAdapter',skillId,null)}
   getTrainingBackend(skillId){return this.value('trainingBackend',skillId,null)}
