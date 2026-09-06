@@ -8,12 +8,14 @@ export const ENVIRONMENT_BRIDGE_COMMANDS=Object.freeze({
   METRICS:'metrics',
   DESCRIBE:'describe',
   DOMAIN_CALL:'domain_call',
+  SENSOR_MANIFEST:'sensor_manifest',
+  SENSOR_READ:'sensor_read',
   GENERATE_SCENARIOS:'generate_scenarios',
   APPLY_SCENARIO:'apply_scenario',
   TASK_TEXT:'task_text'
 });
 
-export const REMOTE_STATE_FIELDS=Object.freeze(['robot','pallets','locations','perception','simulation','obstacle','failures','path','benchmark']);
+export const REMOTE_STATE_FIELDS=Object.freeze(['robot','pallets','locations','perception','simulation','obstacle','failures','path','benchmark','spatial','sensors']);
 
 const isObject=v=>!!v&&typeof v==='object'&&!Array.isArray(v);
 
@@ -27,7 +29,7 @@ export function validateBridgeEnvelope(value,{requireResponse=false}={}){
   if(!isObject(value))return{ok:false,issues:['envelope_not_object']};
   if(value.protocol!==ENVIRONMENT_BRIDGE_PROTOCOL)issues.push(`protocol_mismatch:${value.protocol||'missing'}`);
   if(requireResponse&&typeof value.ok!=='boolean')issues.push('response_ok_missing');
-  if(value.command&& !Object.values(ENVIRONMENT_BRIDGE_COMMANDS).includes(value.command))issues.push(`unknown_command:${value.command}`);
+  if(value.command&&!Object.values(ENVIRONMENT_BRIDGE_COMMANDS).includes(value.command))issues.push(`unknown_command:${value.command}`);
   return{ok:issues.length===0,issues};
 }
 
@@ -56,8 +58,9 @@ export function describeEnvironmentBridgeProtocol(){
     protocol:ENVIRONMENT_BRIDGE_PROTOCOL,
     transport:'request/response JSON; HTTP POST is the first transport, WebSocket can reuse the same envelopes',
     commands:{...ENVIRONMENT_BRIDGE_COMMANDS},
+    sensorRead:{manifest:'sensor_manifest returns lightweight source descriptors',read:'sensor_read returns one bounded sensor packet on demand; large streams should use URL/stream handles'},
     responseShape:{protocol:ENVIRONMENT_BRIDGE_PROTOCOL,requestId:'echo request id',command:'echo command',ok:true,data:'command-specific payload',state:'optional semantic runtime-state patch',descriptor:'optional environment descriptor'},
-    ownership:{upperLayer:['task','agent'],environment:['robot','pallets','locations','perception','simulation','obstacle','failures','path','benchmark']},
-    rule:'Environment-native simulator objects/topics must be translated by the bridge. Browser upper layers consume semantic state and domain services only.'
+    ownership:{upperLayer:['task','agent'],environment:['robot','pallets','locations','perception','simulation','obstacle','failures','path','benchmark','spatial','sensors']},
+    rule:'Environment-native simulator objects/topics must be translated by the bridge. Browser upper layers consume semantic state, sensor packets and domain services only.'
   };
 }
