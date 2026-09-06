@@ -23,7 +23,7 @@ jobs:
           node-version: '20'
 
       - name: Python syntax
-        run: python -m compileall -q bridges sim/gazebo_smoke/launch sim/gazebo_smoke/setup.py
+        run: python -m compileall -q bridges sim/gazebo_smoke/launch sim/gazebo_smoke/scripts sim/gazebo_smoke/setup.py
 
       - name: Environment bridge unit tests
         run: python -m unittest -v bridges.python.test_environment_bridge_core
