@@ -1,0 +1,61 @@
+import {RulePolicy} from './rule_policy.js';
+
+const angleWrap=d=>((d+180)%360+360)%360-180;
+const deg2rad=d=>d*Math.PI/180;
+
+export class EnvironmentRulePolicy extends RulePolicy{
+  async serviceAsync(name,...args){return await Promise.resolve(this.service(name,...args))}
+  async pathTo(target){
+    if(this.hasService('path.to'))return await this.serviceAsync('path.to',target);
+    return super.pathTo(target);
+  }
+  async palletApproachPath(pallet){
+    if(this.hasService('path.palletApproach'))return await this.serviceAsync('path.palletApproach',pallet);
+    const preAlign={x:pallet.x-170,y:pallet.y},staging={x:pallet.x-125,y:pallet.y};return[...await this.pathTo(preAlign),staging];
+  }
+  async palletDockTarget(pallet){return this.hasService('target.palletDock')?await this.serviceAsync('target.palletDock',pallet):{x:pallet.x-82,y:pallet.y,yaw:0}}
+  async locationApproachTarget(location){return this.hasService('target.locationApproach')?await this.serviceAsync('target.locationApproach',location):{x:location.x-75,y:location.y}}
+  async retreatTarget(robot=this.state().robot,distance=70){if(this.hasService('target.retreat'))return await this.serviceAsync('target.retreat',robot,distance);const a=deg2rad(robot.yaw);return{x:robot.x-Math.cos(a)*distance,y:robot.y-Math.sin(a)*distance}}
+  async dockToPallet(pallet){
+    const s=this.state(),path=await this.palletApproachPath(pallet),staging=path.at(-1)||{x:pallet.x-125,y:pallet.y},final=await this.palletDockTarget(pallet);let ticks=0;
+    if(this.worldDistance(s.robot,staging)>16){const stage=await this.driveTo(staging,{tolerance:12,maxTicks:360,allowReverse:true,maxSpeedOverride:34});ticks+=stage.ticks||0;if(!stage.ok)return stage}
+    const finalMove=await this.driveTo(final,{tolerance:10,maxTicks:360,allowReverse:false,maxSpeedOverride:18});ticks+=finalMove.ticks||0;if(!finalMove.ok)return finalMove;
+    const targetYaw=Number.isFinite(Number(final.yaw))?Number(final.yaw):0,yawError=Math.abs(angleWrap(s.robot.yaw-targetYaw));if(yawError>28)return{ok:false,reason:'alignment_heading_error',ticks,yawError};
+    return{ok:true,ticks,yawError,policy:'rule_staged'};
+  }
+  async execute(skill,args={}){
+    const s=this.state(),sim=this.controlConfig();
+    switch(skill){
+      case'navigate_to_pallet':{
+        const p=s.pallets[args.palletId];if(!p)return{ok:false,reason:'pallet_not_found'};const path=await this.palletApproachPath(p),m=await this.followPath(path,{tolerance:12,maxTicks:1100});return m.ok?{ok:true,message:`approached ${p.label} via pre-align path (${sim.controller})`,ticks:m.ticks,meanCrossTrackError:m.meanCrossTrackError??null,policy:m.policy}:{ok:false,reason:m.reason};
+      }
+      case'detect_pallet':{
+        const p=s.pallets[args.palletId];if(!p)return{ok:false,reason:'pallet_not_found'};if(s.failures?.forceDetectionFailure)return{ok:false,reason:'forced_detection_failure'};const d=this.worldDistance(s.robot,p),visible=this.hasService('perception.palletVisible')?await this.serviceAsync('perception.palletVisible',p,s.robot):d<180;if(!visible)return{ok:false,reason:'pallet_not_visible'};if(this.hasService('perception.markDetected'))await this.serviceAsync('perception.markDetected',args.palletId);else if(!s.perception.detectedPallets.includes(args.palletId)){s.perception.detectedPallets.push(args.palletId);this.emit()}return{ok:true,message:`${p.label} detected (${d.toFixed(1)} ${this.lengthUnit()})`};
+      }
+      case'align_to_pallet':{
+        const p=s.pallets[args.palletId];if(!p)return{ok:false,reason:'pallet_not_found'};if(s.failures?.forceAlignmentFailure)return{ok:false,reason:'forced_alignment_failure'};const m=await this.dockToPallet(p);if(!m.ok)return{ok:false,reason:m.reason,yawError:m.yawError??null};if(this.hasService('robot.setAligned'))await this.serviceAsync('robot.setAligned',true);else{s.robot.aligned=true;this.emit()}return{ok:true,message:`aligned by ${m.policy} (yaw error ${m.yawError.toFixed(1)}°)`,ticks:m.ticks,policy:m.policy};
+      }
+      case'insert_forks':{
+        if(s.failures?.forceInsertionFailure)return{ok:false,reason:'forced_insertion_failure'};if(this.hasService('manipulation.insertForks'))return await this.serviceAsync('manipulation.insertForks',args.palletId);s.robot.carrying=args.palletId;s.pallets[args.palletId].status='on_forks';this.emit();return{ok:true,message:'forks inserted'};
+      }
+      case'lift':{
+        if(this.hasService('manipulation.setFork'))return await this.serviceAsync('manipulation.setFork',true);const res=await this.act({type:'fork',raised:true});return res?.ok===false?res:{ok:true,message:'pallet lifted'};
+      }
+      case'navigate_to':{
+        const l=s.locations[args.locationId];if(!l)return{ok:false,reason:'location_not_found'};const target=await this.locationApproachTarget(l),path=await this.pathTo(target),m=await this.followPath(path,{tolerance:12,maxTicks:1100});return m.ok?{ok:true,message:`followed path to ${l.label} (${sim.controller})`,ticks:m.ticks,meanCrossTrackError:m.meanCrossTrackError??null,policy:m.policy}:{ok:false,reason:m.reason};
+      }
+      case'place':{
+        const l=s.locations[args.locationId],id=s.robot.carrying;if(!id)return{ok:false,reason:'no_load'};if(this.hasService('manipulation.place'))return await this.serviceAsync('manipulation.place',id,args.locationId);s.pallets[id].x=l.x;s.pallets[id].y=l.y;s.pallets[id].status='placed';s.robot.carrying=null;s.robot.forkRaised=false;s.robot.aligned=false;this.emit();return{ok:true,message:`placed at ${l.label}`};
+      }
+      case'retreat':{
+        const target=await this.retreatTarget(s.robot,70),m=await this.driveTo(target,{tolerance:10,maxTicks:320,allowReverse:true,maxSpeedOverride:30});if(!m.ok)return{ok:false,reason:m.reason};if(this.hasService('agent.markRetreated'))await this.serviceAsync('agent.markRetreated',true);else{s.agent.memory.retreated=true;this.emit()}return{ok:true,message:'retreated in reverse',ticks:m.ticks,policy:'classic'};
+      }
+      case'avoid_obstacle':
+        if(this.hasService('agent.setAlternateRoute'))await this.serviceAsync('agent.setAlternateRoute',true);else{s.agent.memory.alternateRoute=true;this.emit()}return{ok:true,message:'alternate waypoint route enabled'};
+      case'reposition_for_detection':{
+        const yaw=deg2rad(s.robot.yaw),target={x:s.robot.x-Math.sin(yaw)*45,y:s.robot.y+Math.cos(yaw)*45},m=await this.driveTo(target,{tolerance:10,maxTicks:260,allowReverse:true,maxSpeedOverride:28});return m.ok?{ok:true,message:'repositioned for another detection attempt'}:{ok:false,reason:m.reason};
+      }
+      default:return super.execute(skill,args);
+    }
+  }
+}
