@@ -26,6 +26,7 @@ export ROBOT_MAX_LINEAR_SPEED="${ROBOT_MAX_LINEAR_SPEED:-1.2}"
 export ROBOT_MAX_REVERSE_SPEED="${ROBOT_MAX_REVERSE_SPEED:-0.8}"
 export BRIDGE_HOST="${BRIDGE_HOST:-0.0.0.0}"
 export BRIDGE_PORT="${BRIDGE_PORT:-8000}"
+export ROBOT_SYSTEMS_ALLOWED_ORIGINS="${ROBOT_SYSTEMS_ALLOWED_ORIGINS:-http://127.0.0.1:8080,http://localhost:8080}"
 
 cat <<EOF
 robot_systems Environment Bridge
@@ -36,6 +37,7 @@ robot_systems Environment Bridge
   rgb        : ${ROBOT_RGB_TOPIC}
   lidar      : ${ROBOT_LIDAR_TOPIC}
   endpoint   : http://127.0.0.1:${BRIDGE_PORT}/environment
+  CORS       : ${ROBOT_SYSTEMS_ALLOWED_ORIGINS}
 EOF
 
 cd "${REPO_ROOT}"
