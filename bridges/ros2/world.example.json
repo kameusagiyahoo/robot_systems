@@ -1,0 +1,11 @@
+{
+  "pallets": {
+    "pallet_A": {"id": "pallet_A", "label": "Pallet A", "x": 4.0, "y": 1.5, "yaw": 0.0, "status": "available"},
+    "pallet_B": {"id": "pallet_B", "label": "Pallet B", "x": 7.0, "y": 2.2, "yaw": 0.0, "status": "available"}
+  },
+  "locations": {
+    "storage_A": {"id": "storage_A", "label": "Storage A", "x": 4.0, "y": 4.0},
+    "storage_B": {"id": "storage_B", "label": "Storage B", "x": 7.0, "y": 4.0},
+    "shipping": {"id": "shipping", "label": "Shipping", "x": 9.0, "y": 1.0}
+  }
+}
