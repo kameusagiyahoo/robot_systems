@@ -17,6 +17,7 @@ export class EnvironmentAdapter{
   getDomainServices(){return{}}
   generateScenarios(_seed,_count){return[]}
   applyScenario(_scenario){throw new Error(`environment_scenario_not_supported:${this.id}`)}
+  async configureTrial(_spec){throw new Error(`environment_trial_configuration_not_supported:${this.id}`)}
   taskTextForScenario(_scenario){return null}
   validateState(){return{ok:true,issues:[]}}
   describe(){
@@ -28,6 +29,7 @@ export class EnvironmentAdapter{
         step:true,
         rendering:this.render!==EnvironmentAdapter.prototype.render,
         scenarios:this.applyScenario!==EnvironmentAdapter.prototype.applyScenario,
+        trialConfiguration:this.configureTrial!==EnvironmentAdapter.prototype.configureTrial,
         metrics:true,
         domainServices:Object.keys(this.getDomainServices?.()||{})
       }
@@ -39,6 +41,7 @@ export class UnavailableEnvironmentAdapter extends EnvironmentAdapter{
   constructor({reason='adapter_not_installed',...descriptor}={}){super({...descriptor,available:false});this.reason=reason}
   async connect(){throw new Error(`environment_unavailable:${this.id}:${this.reason}`)}
   async reset(){throw new Error(`environment_unavailable:${this.id}:${this.reason}`)}
+  async configureTrial(){throw new Error(`environment_unavailable:${this.id}:${this.reason}`)}
   getState(){return null}
   describe(){return{...super.describe(),available:false,reason:this.reason}}
 }
