@@ -8,6 +8,7 @@ import {validateTaskRuntimeState,TASK_RUNTIME_STATE_SCHEMA} from './task_state_c
 function bodyData(body){return body?.data??body?.result??null}
 function responseState(body){return body?.state??bodyData(body)?.state??null}
 function responseDescriptor(body){return body?.descriptor??bodyData(body)?.descriptor??null}
+const distance=(a,b)=>Math.hypot((Number(a?.x)||0)-(Number(b?.x)||0),(Number(a?.y)||0)-(Number(b?.y)||0));
 
 class RemoteRobotProxy extends RobotInterface{
   constructor(environment){super();this.environment=environment}
@@ -62,7 +63,9 @@ export class RemoteEnvironmentAdapter extends EnvironmentAdapter{
       'action.send':action=>this.step(action),
       'metrics.get':()=>this.getMetrics(),
       'environment.describe':()=>this.describe(),
-      'scenario.configure':spec=>this.configureTrial(spec)
+      'scenario.configure':spec=>this.configureTrial(spec),
+      'world.distance':(a,b)=>distance(a,b),
+      'control.config':()=>this.store.state.simulation
     };
     for(const name of this.remoteDomainServices)if(!local[name])local[name]=(...args)=>this.domainCall(name,...args);
     return local;
