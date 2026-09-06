@@ -7,6 +7,7 @@ from copy import deepcopy
 from typing import Any, Dict, Optional
 
 from bridges.python.environment_bridge_core import EnvironmentBackend
+from bridges.ros2.drive_command_adapter import create_drive_command_adapter
 
 
 def _yaw_from_quaternion(x: float, y: float, z: float, w: float) -> float:
@@ -20,17 +21,16 @@ def _distance(a: Dict[str, Any], b: Dict[str, Any]) -> float:
 
 
 class Ros2TwistForkliftBackend(EnvironmentBackend):
-    """Reference ROS 2 bridge using nav_msgs/Odometry and geometry_msgs/Twist.
+    """Reference ROS 2 environment backend.
 
-    This backend is intentionally generic. It is suitable for bridge/integration
-    checks when a robot or Gazebo model already exposes /odom and /cmd_vel.
-    A production forklift should normally replace it with an Ackermann/rear-steer
-    controller backend and real contact/fork feedback.
+    Odometry remains the common state source while drive commands are delegated
+    to a pluggable DriveCommandAdapter (Twist, Ackermann, rear-steer joint, ...).
+    The historical class name is retained for import compatibility.
     """
 
-    environment_id = "ros2_twist_reference"
-    label = "ROS 2 Twist Reference"
-    version = 1
+    environment_id = "ros2_drive_reference"
+    label = "ROS 2 Drive Reference"
+    version = 2
     kind = "simulation_or_hardware"
     fidelity = "integration_reference"
 
@@ -40,6 +40,11 @@ class Ros2TwistForkliftBackend(EnvironmentBackend):
         node_name: str = "robot_systems_environment_bridge",
         odom_topic: str = "/odom",
         cmd_vel_topic: str = "/cmd_vel",
+        drive_mode: str = "twist",
+        ackermann_topic: str = "/drive",
+        rear_speed_topic: Optional[str] = None,
+        rear_steering_topic: Optional[str] = None,
+        speed_command_scale: float = 1.0,
         fork_topic: Optional[str] = None,
         world: Optional[Dict[str, Any]] = None,
         wheelbase: float = 1.2,
@@ -55,7 +60,6 @@ class Ros2TwistForkliftBackend(EnvironmentBackend):
             import rclpy
             from rclpy.node import Node
             from nav_msgs.msg import Odometry
-            from geometry_msgs.msg import Twist
             from std_msgs.msg import Float64
         except ImportError as exc:
             raise RuntimeError("ROS2 Python packages are required inside a ROS 2 environment") from exc
@@ -63,14 +67,10 @@ class Ros2TwistForkliftBackend(EnvironmentBackend):
         self.rclpy = rclpy
         self.Node = Node
         self.Odometry = Odometry
-        self.Twist = Twist
         self.Float64 = Float64
         if not rclpy.ok():
             rclpy.init(args=None)
         self.node = Node(node_name)
-        self.cmd_pub = self.node.create_publisher(Twist, cmd_vel_topic, 10)
-        self.fork_pub = self.node.create_publisher(Float64, fork_topic, 10) if fork_topic else None
-        self.node.create_subscription(Odometry, odom_topic, self._on_odom, 20)
 
         self.wheelbase = float(wheelbase)
         self.body_length = float(body_length)
@@ -80,6 +80,21 @@ class Ros2TwistForkliftBackend(EnvironmentBackend):
         self.max_steering_angle_deg = float(max_steering_angle_deg)
         self.rear_steer_sign = float(rear_steer_sign)
         self.detection_range = float(detection_range)
+        self.drive_mode = str(drive_mode or "twist")
+        self.drive_adapter = create_drive_command_adapter(
+            self.node,
+            self.drive_mode,
+            wheelbase=self.wheelbase,
+            cmd_vel_topic=cmd_vel_topic,
+            ackermann_topic=ackermann_topic,
+            rear_speed_topic=rear_speed_topic,
+            rear_steering_topic=rear_steering_topic,
+            rear_steer_sign=self.rear_steer_sign,
+            speed_command_scale=speed_command_scale,
+        )
+        self.fork_pub = self.node.create_publisher(Float64, fork_topic, 10) if fork_topic else None
+        self.node.create_subscription(Odometry, odom_topic, self._on_odom, 20)
+
         self.lock = threading.RLock()
         self.last_odom_time: Optional[float] = None
         self.last_pose: Optional[tuple[float, float]] = None
@@ -101,7 +116,7 @@ class Ros2TwistForkliftBackend(EnvironmentBackend):
                 "pathLength": 0.0,
                 "controlTicks": 0,
                 "collisions": 0,
-                "vehicleModel": "ros2_twist_rear_steer_approximation",
+                "vehicleModel": f"ros2_{self.drive_adapter.adapter_id}",
                 "controller": "pure_pursuit",
                 "lookaheadDistance": max(0.4, wheelbase),
                 "batchMode": False,
@@ -127,6 +142,10 @@ class Ros2TwistForkliftBackend(EnvironmentBackend):
 
     def close(self) -> None:
         self._running = False
+        try:
+            self.drive_adapter.stop()
+        except Exception:
+            pass
         if self._spin_thread:
             self._spin_thread.join(timeout=1.0)
         try:
@@ -171,7 +190,7 @@ class Ros2TwistForkliftBackend(EnvironmentBackend):
         base.update({
             "coordinateFrame": {"name": "odom/world from ROS 2", "dimensions": 3, "angleCompatibility": "degrees in task-state yaw; quaternion in spatial state"},
             "units": {"length": "m", "time": "s", "speed": "m/s"},
-            "intendedUse": "ROS2/Gazebo integration reference. Replace Twist mapping for production forklift dynamics.",
+            "intendedUse": "ROS2 integration reference with pluggable drive-command mapping. Choose a vehicle-appropriate adapter for physics/hardware validation.",
             "capabilities": {
                 **base["capabilities"],
                 "reset": False,
@@ -188,7 +207,8 @@ class Ros2TwistForkliftBackend(EnvironmentBackend):
                 "teleport": False,
                 "domainServices": list(self.domain_services()),
             },
-            "topics": {"command": self.cmd_pub.topic_name, "fork": self.fork_pub.topic_name if self.fork_pub else None},
+            "driveAdapter": self.drive_adapter.describe(),
+            "topics": {"odometry": self.node.resolve_topic_name("/odom") if hasattr(self.node, "resolve_topic_name") else None, "fork": self.fork_pub.topic_name if self.fork_pub else None},
         })
         return base
 
@@ -199,19 +219,19 @@ class Ros2TwistForkliftBackend(EnvironmentBackend):
     def step(self, action: Dict[str, Any]) -> Dict[str, Any]:
         action_type = action.get("type")
         if action_type == "stop":
-            action = {"type": "drive", "speed": 0.0, "steeringAngle": 0.0}
-            action_type = "drive"
+            result = self.drive_adapter.stop()
+            with self.lock:
+                self._state["robot"]["steeringAngle"] = 0.0
+            return result
         if action_type == "drive":
-            speed = float(action.get("speed", 0.0))
+            speed = max(-self.max_reverse_speed, min(self.max_linear_speed, float(action.get("speed", 0.0))))
             steer_deg = max(-self.max_steering_angle_deg, min(self.max_steering_angle_deg, float(action.get("steeringAngle", 0.0))))
-            speed = max(-self.max_reverse_speed, min(self.max_linear_speed, speed))
-            yaw_rate = self.rear_steer_sign * speed / max(self.wheelbase, 1e-6) * math.tan(math.radians(steer_deg))
-            msg = self.Twist();msg.linear.x = speed;msg.angular.z = yaw_rate;self.cmd_pub.publish(msg)
+            result = self.drive_adapter.command(speed, steer_deg)
             with self.lock:
                 self._state["robot"]["steeringAngle"] = steer_deg
                 self.metrics_state["controlTicks"] += 1
                 self._sync_metrics_to_state()
-            return {"ok": True, "type": "drive", "speed": speed, "steeringAngle": steer_deg, "yawRateCommand": yaw_rate}
+            return {"type": "drive", **result}
         if action_type == "fork":
             if self.fork_pub is None:
                 return {"ok": False, "reason": "fork_topic_not_configured"}
