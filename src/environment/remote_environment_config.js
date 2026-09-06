@@ -15,7 +15,11 @@ function sanitizeDescriptor(descriptor){
     coordinateFrame:descriptor.coordinateFrame||null,
     units:descriptor.units||null,
     capabilities:descriptor.capabilities||null,
+    sensorManifest:Array.isArray(descriptor.sensorManifest)?descriptor.sensorManifest.map(s=>({sensorId:s.sensorId||null,type:s.type||null,topic:s.topic||null,available:!!s.available,transport:s.transport||null})):[],
+    driveAdapter:descriptor.driveAdapter||null,
+    gazebo:descriptor.gazebo||null,
     intendedUse:descriptor.intendedUse||null,
+    limitations:Array.isArray(descriptor.limitations)?descriptor.limitations:[],
     capturedAt:new Date().toISOString()
   };
 }
