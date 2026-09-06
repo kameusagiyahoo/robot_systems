@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from typing import Iterable
 
-from environment_bridge_core import EnvironmentBackend, EnvironmentBridgeRouter
+from .environment_bridge_core import EnvironmentBackend, EnvironmentBridgeRouter
 
 
 def create_app(backend: EnvironmentBackend, allowed_origins: Iterable[str] | None = None):
