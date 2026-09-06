@@ -7,6 +7,7 @@ import time
 
 PROTOCOL = "robot_systems.environment_bridge.v1"
 TASK_STATE_SCHEMA = "robot_systems.task_runtime_state.v1"
+SENSOR_PACKET_SCHEMA = "robot_systems.sensor_packet.v1"
 
 
 class EnvironmentBackend(ABC):
@@ -45,6 +46,7 @@ class EnvironmentBackend(ABC):
                 "observation": True,
                 "step": True,
                 "metrics": True,
+                "sensorRead": bool(list(self.sensor_manifest())),
                 "domainServices": list(self.domain_services()),
             },
         }
@@ -72,6 +74,12 @@ class EnvironmentBackend(ABC):
 
     def domain_call(self, name: str, args: list[Any]) -> Any:
         raise NotImplementedError(f"domain_service_not_supported:{name}")
+
+    def sensor_manifest(self) -> list[Dict[str, Any]]:
+        return []
+
+    def read_sensor(self, sensor_id: str, options: Dict[str, Any]) -> Dict[str, Any]:
+        raise NotImplementedError(f"sensor_read_not_supported:{sensor_id}")
 
     def generate_scenarios(self, seed: Any, count: int) -> list[Dict[str, Any]]:
         raise NotImplementedError("generate_scenarios_not_supported")
@@ -133,7 +141,7 @@ class EnvironmentBridgeRouter:
 
         try:
             return self._dispatch(request_id, command, payload).as_dict()
-        except Exception as exc:  # bridge boundary: convert backend errors to protocol errors
+        except Exception as exc:
             return BridgeResponse(
                 request_id, command, False,
                 error=f"{exc.__class__.__name__}:{exc}",
@@ -171,6 +179,14 @@ class EnvironmentBridgeRouter:
             args = list(payload.get("args") or [])
             value = b.domain_call(name, args)
             return BridgeResponse(request_id, command, True, data={"value": value}, state=b.state())
+        if command == "sensor_manifest":
+            return BridgeResponse(request_id, command, True, data={"sensors": b.sensor_manifest()})
+        if command == "sensor_read":
+            sensor_id = str(payload.get("sensorId") or "")
+            if not sensor_id:
+                raise ValueError("sensor_id_required")
+            packet = b.read_sensor(sensor_id, payload.get("options") or {})
+            return BridgeResponse(request_id, command, True, data={"packet": packet})
         if command == "generate_scenarios":
             scenarios = b.generate_scenarios(payload.get("seed"), int(payload.get("count") or 1))
             return BridgeResponse(request_id, command, True, data={"scenarios": scenarios})
