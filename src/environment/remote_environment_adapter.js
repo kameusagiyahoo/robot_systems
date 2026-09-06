@@ -4,6 +4,7 @@ import {RobotInterface} from '../robot/robot_interface.js';
 import {HttpJsonEnvironmentTransport} from './remote_environment_transport.js';
 import {ENVIRONMENT_BRIDGE_COMMANDS,mergeRemoteRuntimeState} from './environment_bridge_protocol.js';
 import {validateTaskRuntimeState,TASK_RUNTIME_STATE_SCHEMA} from './task_state_contract.js';
+import {validateSensorPacket} from './spatial_sensor_contract.js';
 
 function bodyData(body){return body?.data??body?.result??null}
 function responseState(body){return body?.state??bodyData(body)?.state??null}
@@ -22,9 +23,9 @@ class RemoteRobotProxy extends RobotInterface{
 
 export class RemoteEnvironmentAdapter extends EnvironmentAdapter{
   constructor({transport=null,baseUrl=null,endpoint='/environment',headers={},timeoutMs=15000,id='remote_bridge',label='Remote Environment Bridge'}={}){
-    super({id,label,version:2,kind:'external',fidelity:'remote'});
+    super({id,label,version:3,kind:'external',fidelity:'remote'});
     this.transport=transport||new HttpJsonEnvironmentTransport({baseUrl,endpoint,headers,timeoutMs});
-    this.store=new Store();this.robot=new RemoteRobotProxy(this);this.remoteDescriptor=null;this.remoteDomainServices=new Set();this.connected=false;this.lastMetrics={};this.lastObservation=null;this.connectPromise=null;
+    this.store=new Store();this.robot=new RemoteRobotProxy(this);this.remoteDescriptor=null;this.remoteDomainServices=new Set();this.connected=false;this.lastMetrics={};this.lastObservation=null;this.sensorManifestCache=[];this.connectPromise=null;
   }
   sync(body,{emit=true}={}){
     const state=responseState(body);if(state)mergeRemoteRuntimeState(this.store.state,state);
@@ -35,7 +36,7 @@ export class RemoteEnvironmentAdapter extends EnvironmentAdapter{
   async request(command,payload={},{emit=true}={}){const body=await this.transport.request(command,payload);return this.sync(body,{emit})}
   async connect(){
     if(this.connected)return{ok:true,descriptor:this.describe()};if(this.connectPromise)return this.connectPromise;
-    this.connectPromise=(async()=>{await this.transport.connect();const body=await this.request(ENVIRONMENT_BRIDGE_COMMANDS.HANDSHAKE,{client:{name:'robot_systems_web',stateContract:TASK_RUNTIME_STATE_SCHEMA}}, {emit:false});this.connected=true;this.store.emit();return{ok:true,descriptor:this.describe(),remote:bodyData(body)}})();
+    this.connectPromise=(async()=>{await this.transport.connect();const body=await this.request(ENVIRONMENT_BRIDGE_COMMANDS.HANDSHAKE,{client:{name:'robot_systems_web',stateContract:TASK_RUNTIME_STATE_SCHEMA}}, {emit:false});this.connected=true;if(this.remoteDescriptor?.capabilities?.sensorRead){try{await this.sensorManifest({refresh:true})}catch{}}this.store.emit();return{ok:true,descriptor:this.describe(),remote:bodyData(body)}})();
     try{return await this.connectPromise}finally{this.connectPromise=null}
   }
   async disconnect(){try{if(this.connected)await this.transport.disconnect()}finally{this.connected=false}return{ok:true}}
@@ -51,6 +52,8 @@ export class RemoteEnvironmentAdapter extends EnvironmentAdapter{
   validateState(){return validateTaskRuntimeState(this.store.state)}
   async fetchMetrics(){const body=await this.request(ENVIRONMENT_BRIDGE_COMMANDS.METRICS,{}, {emit:false});const data=bodyData(body);this.lastMetrics={...this.lastMetrics,...(data?.metrics||body?.metrics||{})};return this.lastMetrics}
   getMetrics(){const sim=this.store.state.simulation||{};return{pathLength:sim.pathLength||0,controlTicks:sim.controlTicks||0,simTimeSec:(sim.controlTicks||0)*(sim.dt||0),collisions:sim.collisions||0,...this.lastMetrics}}
+  async sensorManifest({refresh=false}={}){if(!refresh&&this.sensorManifestCache.length)return this.sensorManifestCache.map(x=>({...x}));const body=await this.request(ENVIRONMENT_BRIDGE_COMMANDS.SENSOR_MANIFEST,{}, {emit:false}),items=bodyData(body)?.sensors||body?.sensors||[];this.sensorManifestCache=Array.isArray(items)?items.map(x=>({...x})):[];return this.sensorManifestCache.map(x=>({...x}))}
+  async readSensor(sensorId,options={}){const body=await this.request(ENVIRONMENT_BRIDGE_COMMANDS.SENSOR_READ,{sensorId,options},{emit:false}),packet=bodyData(body)?.packet||body?.packet;if(!packet)throw new Error(`remote_sensor_packet_missing:${sensorId}`);const validation=validateSensorPacket(packet);if(!validation.ok)throw new Error(`remote_sensor_packet_invalid:${sensorId}:${validation.issues.join(',')}`);return packet}
   async configureTrial(spec={}){await this.request(ENVIRONMENT_BRIDGE_COMMANDS.CONFIGURE_TRIAL,{spec});return this.store.state}
   async generateScenarios(seed,count){const body=await this.request(ENVIRONMENT_BRIDGE_COMMANDS.GENERATE_SCENARIOS,{seed,count},{emit:false});return bodyData(body)?.scenarios||body?.scenarios||[]}
   async applyScenario(scenario){await this.request(ENVIRONMENT_BRIDGE_COMMANDS.APPLY_SCENARIO,{scenario});return this.store.state}
@@ -84,7 +87,7 @@ export class RemoteEnvironmentAdapter extends EnvironmentAdapter{
 
   getDomainServices(){
     const local={
-      'state.get':()=>this.store.state,'state.emit':()=>this.store.emit(),'action.send':action=>this.step(action),'metrics.get':()=>this.getMetrics(),'environment.describe':()=>this.describe(),'scenario.configure':spec=>this.configureTrial(spec),'world.distance':(a,b)=>distance(a,b),'control.config':()=>this.store.state.simulation,
+      'state.get':()=>this.store.state,'state.emit':()=>this.store.emit(),'action.send':action=>this.step(action),'metrics.get':()=>this.getMetrics(),'environment.describe':()=>this.describe(),'scenario.configure':spec=>this.configureTrial(spec),'sensor.manifest':()=>this.sensorManifest(),'sensor.read':(id,options)=>this.readSensor(id,options),'world.distance':(a,b)=>distance(a,b),'control.config':()=>this.store.state.simulation,
       'path.to':target=>this.pathTo(target),'path.palletApproach':pallet=>this.palletApproachPath(pallet),'target.palletDock':pallet=>this.palletDockTarget(pallet),'target.locationApproach':location=>this.locationApproachTarget(location),'target.retreat':(robot,d)=>this.retreatTarget(robot,d),
       'perception.palletVisible':(pallet,robot)=>this.palletVisible(pallet,robot),'perception.markDetected':id=>this.markDetected(id),'robot.setAligned':v=>this.setAligned(v),'agent.markRetreated':v=>this.markRetreated(v),'agent.setAlternateRoute':v=>this.setAlternateRoute(v),'motion.ioProfile':skillId=>this.motionIOProfile(skillId)
     };
@@ -96,7 +99,7 @@ export class RemoteEnvironmentAdapter extends EnvironmentAdapter{
     return{
       ...base,id:this.id,label:remote.label?`${this.label} → ${remote.label}`:this.label,version:this.version,kind:remote.kind||this.kind,fidelity:remote.fidelity||this.fidelity,
       remoteEnvironmentId:remote.id||null,remoteEnvironmentLabel:remote.label||null,remoteEnvironmentVersion:remote.version??null,stateContract:remote.stateContract||TASK_RUNTIME_STATE_SCHEMA,nativeRuntime:remote.nativeRuntime||'remote_bridge',coordinateFrame:remote.coordinateFrame||null,units:remote.units||null,semanticGeometry:this.semanticGeometry(),transport,
-      capabilities:{...base.capabilities,...(remote.capabilities||{}),domainServices:[...new Set([...Object.keys(this.getDomainServices()),...this.remoteDomainServices])]},bridge:{connected:this.connected,remoteDomainServices:[...this.remoteDomainServices]},intendedUse:remote.intendedUse||'Adapter for external simulation or robot runtime behind robot_systems.environment_bridge.v1',limitations:remote.limitations||[]
+      capabilities:{...base.capabilities,...(remote.capabilities||{}),sensorRead:remote.capabilities?.sensorRead===true||this.sensorManifestCache.length>0,domainServices:[...new Set([...Object.keys(this.getDomainServices()),...this.remoteDomainServices])]},sensorManifest:this.sensorManifestCache.map(x=>({...x})),bridge:{connected:this.connected,remoteDomainServices:[...this.remoteDomainServices]},intendedUse:remote.intendedUse||'Adapter for external simulation or robot runtime behind robot_systems.environment_bridge.v1',limitations:remote.limitations||[]
     };
   }
 }
