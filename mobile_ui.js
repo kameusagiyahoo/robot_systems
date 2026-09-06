@@ -1,14 +1,16 @@
 import './src/learning/plugins/default_skill_plugins.js';
+import './src/environment/remote_environment_ui.js';
 import {SKILL_LEARNING_REGISTRY,skillLearningState,latestEvaluationForPolicy} from './src/learning/skill_learning_registry.js';
 import {getLearningDescriptor} from './src/learning/framework/plugin_registry.js';
+import {selectedEnvironmentId} from './src/environment/environment_selection.js';
 const $=s=>document.querySelector(s);
 
 function ensureStyles(){if(document.querySelector('link[data-skill-learning-style]'))return;const l=document.createElement('link');l.rel='stylesheet';l.href='./skill_learning.css';l.dataset.skillLearningStyle='1';document.head.appendChild(l)}
 function learningStateLabel(skill){
-  const s=skillLearningState(skill.id),cap=getLearningDescriptor(skill.id).capabilities,controller=$('#controllerSelect')?.value||'pure_pursuit',evaluation=latestEvaluationForPolicy(skill.id,s.policy,controller)||latestEvaluationForPolicy(skill.id,s.policy)||s.evaluation,score=evaluation?`${Math.round((evaluation.successRate||0)*100)}%`:'未評価';
-  if(!cap.trainable)return `${skill.group==='perception'?'画像待ち':'固定'} / 評価 ${score}`;
-  if(s.trained)return `${cap.runtimeLearning?(s.policy==='learned'?'学習使用中':'学習済'):'学習済・未接続'} / 評価 ${score}`;
-  return `未学習 / 評価 ${score}`;
+  const s=skillLearningState(skill.id),cap=getLearningDescriptor(skill.id).capabilities,controller=$('#controllerSelect')?.value||'pure_pursuit',env=selectedEnvironmentId(),evaluation=latestEvaluationForPolicy(skill.id,s.policy,controller,s.policy==='learned'?s.model?.modelId||null:null,env)||latestEvaluationForPolicy(skill.id,s.policy,null,s.policy==='learned'?s.model?.modelId||null:null,env),score=evaluation?`${Math.round((evaluation.successRate||0)*100)}%`:'未評価';
+  if(!cap.trainable)return `${skill.group==='perception'?'知覚':'固定'} / ${env}評価 ${score}`;
+  if(s.trained)return `${cap.runtimeLearning?(s.policy==='learned'?'学習使用中':'学習済'):'学習済・未接続'} / ${env}評価 ${score}`;
+  return `未学習 / ${env}評価 ${score}`;
 }
 function renderLearningList(){
   const host=$('#learningSkillList');if(!host)return;host.innerHTML='';
