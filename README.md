@@ -29,8 +29,11 @@ OpenAI APIなどの秘密情報はブラウザ側へ置きません。
 - Environment-scoped evaluation metadata
 - HTTP JSON Remote Environment Bridge
 - generic Python Bridge backend interface
-- ROS2 `/odom` + `/cmd_vel` reference backend
+- ROS2 odometry + pluggable DriveCommandAdapter reference backend
+- Gazebo ROS2 backend with RGB / LiDAR / optional Depth / Contact / Joint inputs
+- Sensor Source Adapter + Perception Inference Backend extension points
 - Browser2D smoke-test adapter
+- self-contained Gazebo integration smoke world
 
 ## Architecture
 
@@ -43,15 +46,16 @@ Skill
    ↓
 SkillExecutor
    ├ Classic Policy / Controller
-   └ Learning Runtime Router → Skill Plugin Runtime Adapter
+   ├ Learning Runtime Router → Skill Plugin Runtime Adapter
+   └ Sensor Inference Runtime → Perception Backend
    ↓
-Skill I/O / Domain Services
+Skill I/O / Sensor Source / Domain Services
    ↓
 Environment Adapter
    ↓
 ┌─────────────────────────────┐
 │ Browser2D   : smoke test    │
-│ Gazebo      : physics       │
+│ Gazebo      : physics/sensor│
 │ MuJoCo      : physics       │
 │ Isaac Sim   : physics/sensor│
 │ ROS2 / Real Robot           │
@@ -59,6 +63,48 @@ Environment Adapter
 ```
 
 Browser2Dの座標・描画・簡易運動学を上位Skillの仕様にしないことが基本方針です。
+
+## First external-environment gate
+
+最初に行うべき検証は、AI性能向上ではなく **Browser2D → Gazeboの差し替えが上位層を壊さず通ること** です。
+
+リポジトリには最小統合環境を用意しています。
+
+```text
+sim/gazebo_smoke/
+  worlds/forklift_smoke.sdf
+  config/bridge.yaml
+  config/environment.json
+  launch/smoke.launch.py
+  scripts/
+  README.md
+```
+
+最初の合格条件:
+
+```text
+Browser Task
+↓
+NavigateToPallet
+↓
+Classic Policy
+↓
+RemoteEnvironmentAdapter
+↓
+Environment Bridge
+↓
+/cmd_vel
+↓
+Gazebo forklift moves
+↓
+/odom
+↓
+Browser state updates
+```
+
+実行手順: `sim/gazebo_smoke/README.md`
+
+このSmokeモデルは差動二輪で、フォークリフト形状を持つ**統合確認モデル**です。フォークリフトの最終Dynamics評価には使用しません。
 
 ## Environment Framework
 
@@ -115,18 +161,19 @@ forkActuation
 palletManipulation
 teleport
 trialConfiguration
+sensorRead
 ```
 
 `SkillExecutor` は実行前にCapabilityを確認します。
 
-たとえば `InsertForks` は、専用のManipulation Service、または Fork actuation + Contact feedback がないEnvironmentでは実行対象として扱いません。
+Manipulation Skillは、センサやアクチュエータが存在するだけで成功扱いにはしません。`InsertForks` / `Place` は明示的なManipulation Serviceが実装されるまで高忠実度Environmentでは未対応です。
 
 ## Remote Environment Bridge
 
 BrowserがGazebo等のAPIへ直接依存しないよう、共通Bridgeを使います。
 
 ```text
-Browser / GitHub Pages
+Browser / local Web UI
         ↓
 RemoteEnvironmentAdapter
         ↓
@@ -143,15 +190,20 @@ Python側:
 bridges/python/
   environment_bridge_core.py
   http_server.py
+  perception_inference.py
   requirements.txt
 
 bridges/ros2/
+  drive_command_adapter.py
   ros2_twist_backend.py
   run_bridge.py
-  world.example.json
+
+bridges/gazebo/
+  gazebo_ros2_backend.py
+  run_bridge.py
 ```
 
-ROS2参照Backendは `/odom` と `/cmd_vel` を使うBridge接続確認用です。最終フォークリフトの高忠実度Dynamics実装ではありません。
+Drive commandはBackendへ固定せず、`Twist / Ackermann / Rear-steer joint` などを `DriveCommandAdapter` で交換する設計です。
 
 研究設定画面の **External Environment Bridge** からBridge URLを保存・接続テストできます。秘密鍵/APIキーは保存しません。
 
@@ -193,6 +245,8 @@ Skill
 ├ Demonstration Recorder Adapter
 ├ Training Backend
 ├ Skill I/O Adapter
+├ Sensor Source Adapter
+├ Inference Backend
 ├ Runtime Policy Adapter
 ├ Evaluation Scenario Adapter
 ├ Evaluation Metrics
@@ -202,10 +256,10 @@ Skill
 現在の例:
 
 - Motion Skills → Behavior Cloning Plugin
-- DetectPallet → future Perception Plugin
-- Insert/Lift/Place → future Manipulation Plugin
+- DetectPallet → Sensor Source + pluggable Inference Framework
+- Insert/Lift/Place → future physical Manipulation Plugin
 
-`Behavior Cloning` はFramework本体ではなく、最初のPlugin実装です。
+`Behavior Cloning` やDetectorはFramework本体ではなくPlugin実装です。
 
 ## Canonical learning I/O
 
@@ -229,16 +283,29 @@ Environment action
 
 Model入力は車体相対・無次元です。
 
-例:
-
-- forward / lateral
-- yawSin / yawCos
-- normalized speed
-- normalized steering
-
 これは**単位とInterfaceの互換性**を作る仕組みです。Dynamics Gap / Sensor Gap / Appearance Gap / Latency / Contact mismatchを解決するものではありません。
 
 旧ModelにObservation/Action Space IDがない場合、新Canonical Runtimeでは再学習を要求します。
+
+## Perception route
+
+高忠実度Environmentでは真値座標の近接判定を実認識性能として扱いません。
+
+```text
+Camera / Depth / LiDAR
+↓
+Sensor Source Adapter
+↓
+Inference Backend
+↓
+YOLO / Segmentation / VLM / Pose Estimator
+↓
+Detection Result
+↓
+DetectPallet
+```
+
+Browser2Dだけは `ground_truth_smoke` として明示したSmoke Detectorを使用できます。
 
 ## Demonstration route
 
@@ -296,51 +363,18 @@ Seed / Trials
 Metrics
 ```
 
-Scenario座標はBrowser2Dのpx値をそのままmへ変換せず、車体wheelbase基準でスケーリングします。
-
-`trialConfiguration`を持たない実機/参照Backendでは、現在の自動Skill評価を拒否します。実機評価は別の安全なExperiment Protocolとして実装する方針です。
-
-## Learning Framework files
-
-```text
-src/learning/framework/
-  skill_learning_plugin.js
-  plugin_registry.js
-  dataset_adapter.js
-  demonstration_recorder_adapter.js
-  demonstration_episode_store.js
-  dataset_split.js
-  training_backend.js
-  skill_io_adapter.js
-  runtime_policy_adapter.js
-  runtime_router.js
-  evaluation_scenario_adapter.js
-  visualization_renderer.js
-  episode_metadata.js
-  domain_service_interface.js
-  model_identity.js
-  skill_package.js
-
-src/learning/plugins/
-  default_skill_plugins.js
-  motion_skill_io_adapter.js
-  motion_dataset_adapter.js
-  motion_demonstration_recorder.js
-  motion_bc_training_backend.js
-  motion_bc_runtime.js
-  forklift_evaluation_scenarios.js
-```
+`trialConfiguration`を持たない実機やSmoke Bridgeでは自動teleport評価を拒否します。Gazeboの自動Trial評価を有効化する場合も、明示的なSetEntityPose Bridgeを設定したときだけCapabilityを有効化します。
 
 ## Research migration path
 
 ```text
 Browser2D Smoke Test
 ↓
-Environment / Learning Framework
+Gazebo integration smoke gate
 ↓
-ROS2 / Gazebo Bridge
+rear-steer / ros2_control dynamics
 ↓
-3D + Contact + Camera/Depth
+Fork Joint + Contact + RGB-D
 ↓
 Perception / Pose / Visual Servo
 ↓
@@ -353,6 +387,7 @@ Controlled real-forklift validation
 
 ## Documents
 
+- `sim/gazebo_smoke/README.md` — 最小Gazebo統合試験
 - `docs/environment_adapter_architecture.md` — Environment交換設計
 - `docs/environment_bridge_protocol.md` — 外部Simulator/ROS2 Bridge契約
 - `docs/architecture.md` — layer design
