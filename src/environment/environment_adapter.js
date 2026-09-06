@@ -1,7 +1,6 @@
 export class EnvironmentAdapter{
-  constructor({id,label,version=1,kind='simulation',fidelity='unknown',available=true}={}){
-    if(!id)throw new Error('environment_adapter_id_required');
-    this.id=id;this.label=label||id;this.version=version;this.kind=kind;this.fidelity=fidelity;this.available=available;
+  constructor({id,label,version=1,kind='simulation',fidelity='unknown',available=true,capabilities={}}={}){
+    if(!id)throw new Error('environment_adapter_id_required');this.id=id;this.label=label||id;this.version=version;this.kind=kind;this.fidelity=fidelity;this.available=available;this.capabilityDescriptor={...capabilities};
   }
   async connect(){return{ok:true}}
   async disconnect(){return{ok:true}}
@@ -20,21 +19,13 @@ export class EnvironmentAdapter{
   async configureTrial(_spec){throw new Error(`environment_trial_configuration_not_supported:${this.id}`)}
   taskTextForScenario(_scenario){return null}
   validateState(){return{ok:true,issues:[]}}
-  describe(){
-    return{
-      id:this.id,label:this.label,version:this.version,kind:this.kind,fidelity:this.fidelity,available:this.available,
-      capabilities:{
-        reset:this.reset!==EnvironmentAdapter.prototype.reset,
-        observation:true,
-        step:true,
-        rendering:this.render!==EnvironmentAdapter.prototype.render,
-        scenarios:this.applyScenario!==EnvironmentAdapter.prototype.applyScenario,
-        trialConfiguration:this.configureTrial!==EnvironmentAdapter.prototype.configureTrial,
-        metrics:true,
-        domainServices:Object.keys(this.getDomainServices?.()||{})
-      }
-    };
-  }
+  capabilities(){return{
+    reset:this.reset!==EnvironmentAdapter.prototype.reset,observation:true,step:true,rendering:this.render!==EnvironmentAdapter.prototype.render,scenarios:this.applyScenario!==EnvironmentAdapter.prototype.applyScenario,trialConfiguration:this.configureTrial!==EnvironmentAdapter.prototype.configureTrial,metrics:true,
+    batch:false,teleport:false,camera:false,depth:false,contact:false,physics:false,hardware:false,deterministicSeed:false,realTime:false,
+    supportedActions:[],supportedSensors:[],supportedControllers:[],domainServices:Object.keys(this.getDomainServices?.()||{}),...this.capabilityDescriptor
+  }}
+  supports(capability){return!!this.capabilities()?.[capability]}
+  describe(){return{id:this.id,label:this.label,version:this.version,kind:this.kind,fidelity:this.fidelity,available:this.available,capabilities:this.capabilities()}}
 }
 
 export class UnavailableEnvironmentAdapter extends EnvironmentAdapter{
