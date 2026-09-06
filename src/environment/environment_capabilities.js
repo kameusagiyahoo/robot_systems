@@ -5,7 +5,7 @@ export const ENVIRONMENT_CAPABILITIES=Object.freeze({
 
 const SKILL_REQUIREMENTS=Object.freeze({
   navigate_to_pallet:{anyAll:[['pose2d'],['pose3d']],services:['action.send']},
-  detect_pallet:{anyAll:[['perception.palletVisible'],['rgb'],['depth'],['lidar']]},
+  detect_pallet:{anyAll:[['perception.detectPallet'],['rgb','sensorRead'],['depth','sensorRead'],['lidar','sensorRead']]},
   align_to_pallet:{anyAll:[['pose2d'],['pose3d']],services:['action.send']},
   insert_forks:{services:['manipulation.insertForks']},
   lift:{anyAll:[['manipulation.setFork'],['forkActuation']]},
@@ -27,4 +27,4 @@ export function environmentSupportsSkill(environmentOrDescriptor,skillId){
 
 export function environmentCapabilityMatrix(environmentOrDescriptor,skillIds=[]){return Object.fromEntries(skillIds.map(id=>[id,environmentSupportsSkill(environmentOrDescriptor,id)]))}
 
-export function describeEnvironmentCapabilities(){return{capabilities:{...ENVIRONMENT_CAPABILITIES},skillRequirements:SKILL_REQUIREMENTS,note:'Capabilities describe what an environment can physically/sensorially support. Manipulation Skills require explicit semantic services; sensor/actuator presence alone is not treated as task completion.'}}
+export function describeEnvironmentCapabilities(){return{capabilities:{...ENVIRONMENT_CAPABILITIES},skillRequirements:SKILL_REQUIREMENTS,note:'Detection requires an explicit semantic detector service or readable physical sensor source. Ground-truth proximity alone is not treated as perception in high-fidelity environments. Manipulation Skills likewise require explicit semantic services.'}}
