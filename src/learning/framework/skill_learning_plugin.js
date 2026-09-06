@@ -9,6 +9,8 @@ export class SkillLearningPlugin{
   getDatasetSchema(){return null}
   getSkillIOAdapter(){return null}
   getDatasetAdapter(){return null}
+  getSensorSourceAdapter(){return null}
+  getInferenceBackend(){return null}
   getDemonstrationRecorderAdapter(){return null}
   getTrainingBackend(){return null}
   getTrainingParameters(){return[]}
@@ -24,7 +26,7 @@ export class SkillLearningPlugin{
     return defaultEvaluator(skillId,options);
   }
   describe(skillId){
-    const evaluationMetrics=this.getEvaluationMetrics(skillId),ioAdapter=this.getSkillIOAdapter(skillId),runtimeAdapter=this.getRuntimePolicyAdapter(skillId),scenarioAdapter=this.getEvaluationScenarioAdapter(skillId),datasetAdapter=this.getDatasetAdapter(skillId),recorderAdapter=this.getDemonstrationRecorderAdapter(skillId),trainingBackend=this.getTrainingBackend(skillId);
+    const evaluationMetrics=this.getEvaluationMetrics(skillId),ioAdapter=this.getSkillIOAdapter(skillId),runtimeAdapter=this.getRuntimePolicyAdapter(skillId),scenarioAdapter=this.getEvaluationScenarioAdapter(skillId),datasetAdapter=this.getDatasetAdapter(skillId),sensorSourceAdapter=this.getSensorSourceAdapter(skillId),inferenceBackend=this.getInferenceBackend(skillId),recorderAdapter=this.getDemonstrationRecorderAdapter(skillId),trainingBackend=this.getTrainingBackend(skillId);
     return{
       pluginId:this.id,
       pluginLabel:this.label,
@@ -34,6 +36,8 @@ export class SkillLearningPlugin{
       datasetSchema:this.getDatasetSchema(skillId),
       skillIOAdapter:ioAdapter?.describe?.(skillId)||null,
       datasetAdapter:datasetAdapter?.describe?.(skillId)||null,
+      sensorSourceAdapter:sensorSourceAdapter?.describe?.(skillId)||null,
+      inferenceBackend:inferenceBackend?.describe?.(skillId)||null,
       demonstrationRecorderAdapter:recorderAdapter?.describe?.(skillId)||null,
       trainingBackend:trainingBackend?.describe?.(skillId)||null,
       trainingParameters:this.getTrainingParameters(skillId),
@@ -57,6 +61,8 @@ export class DescriptorOnlyLearningPlugin extends SkillLearningPlugin{
   getDatasetSchema(skillId){return this.value('datasetSchema',skillId,null)}
   getSkillIOAdapter(skillId){return this.value('skillIOAdapter',skillId,null)}
   getDatasetAdapter(skillId){return this.value('datasetAdapter',skillId,null)}
+  getSensorSourceAdapter(skillId){return this.value('sensorSourceAdapter',skillId,null)}
+  getInferenceBackend(skillId){return this.value('inferenceBackend',skillId,null)}
   getDemonstrationRecorderAdapter(skillId){return this.value('demonstrationRecorderAdapter',skillId,null)}
   getTrainingBackend(skillId){return this.value('trainingBackend',skillId,null)}
   getTrainingParameters(skillId){return this.value('trainingParameters',skillId,[])}
