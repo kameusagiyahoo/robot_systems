@@ -3,7 +3,8 @@ export class SkillDomainServiceProvider{
   has(){return false}
   list(){return[]}
   call(name,..._args){throw new Error(`domain_service_not_available:${this.id}:${name}`)}
-  describe(){return{id:this.id,label:this.label,version:this.version,services:this.list()}}
+  async callAsync(name,...args){return await Promise.resolve(this.call(name,...args))}
+  describe(){return{id:this.id,label:this.label,version:this.version,services:this.list(),asyncCapable:true}}
 }
 
 export class ObjectDomainServiceProvider extends SkillDomainServiceProvider{
@@ -18,6 +19,8 @@ export class CompositeDomainServiceProvider extends SkillDomainServiceProvider{
   add(provider,{prepend=false}={}){if(provider)prepend?this.providers.unshift(provider):this.providers.push(provider);return this}
   has(name){return this.providers.some(p=>typeof p?.has==='function'&&p.has(name))}
   list(){return[...new Set(this.providers.flatMap(p=>typeof p?.list==='function'?p.list():[]))]}
-  call(name,...args){for(const p of this.providers){if(typeof p?.has==='function'&&p.has(name))return p.call(name,...args)}throw new Error(`domain_service_not_available:${this.id}:${name}`)}
+  providerFor(name){return this.providers.find(p=>typeof p?.has==='function'&&p.has(name))||null}
+  call(name,...args){const p=this.providerFor(name);if(p)return p.call(name,...args);throw new Error(`domain_service_not_available:${this.id}:${name}`)}
+  async callAsync(name,...args){const p=this.providerFor(name);if(!p)throw new Error(`domain_service_not_available:${this.id}:${name}`);if(typeof p.callAsync==='function')return await p.callAsync(name,...args);return await Promise.resolve(p.call(name,...args))}
   describe(){return{...super.describe(),providers:this.providers.map(p=>p?.describe?.()||{id:p?.id||'unknown'})}}
 }
