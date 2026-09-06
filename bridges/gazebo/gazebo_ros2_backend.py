@@ -27,14 +27,15 @@ def _yaw_quaternion(yaw_deg: float) -> tuple[float, float, float, float]:
 class GazeboRos2ForkliftBackend(Ros2TwistForkliftBackend):
     """Gazebo-specific ROS 2 backend.
 
-    Motion still uses the generic ROS 2 odometry / command boundary. Gazebo-only
-    concerns (teleporting entities, RGB/depth/lidar, joints and contacts) stay in
-    this adapter so Planner / Skill / Learning code never depends on Gazebo APIs.
+    Motion uses the common ROS 2 odometry / pluggable drive-command boundary.
+    Gazebo-only concerns (teleporting entities, RGB/depth/lidar, joints and
+    contacts) stay in this adapter so Planner / Skill / Learning code never
+    depends on Gazebo APIs.
     """
 
     environment_id = "gazebo_ros2_forklift"
     label = "Gazebo ROS 2 Forklift"
-    version = 1
+    version = 2
     kind = "simulation"
     fidelity = "physics_sensor"
 
@@ -93,9 +94,9 @@ class GazeboRos2ForkliftBackend(Ros2TwistForkliftBackend):
         except ImportError:
             SetEntityPose = None
         self.SetEntityPose = SetEntityPose
-        service_name = set_pose_service or f"/world/{world_name}/set_pose"
+        service_name = str(set_pose_service).strip() if set_pose_service else None
         self.set_pose_service = service_name
-        self.set_pose_client = self.node.create_client(SetEntityPose, service_name) if SetEntityPose else None
+        self.set_pose_client = self.node.create_client(SetEntityPose, service_name) if SetEntityPose and service_name else None
 
         if rgb_topic:
             self.node.create_subscription(Image, rgb_topic, lambda msg: self._on_image("rgb", msg), 2)
@@ -328,6 +329,6 @@ class GazeboRos2ForkliftBackend(Ros2TwistForkliftBackend):
             "gazebo": {"world": self.world_name, "robotEntity": self.robot_entity, "setPoseService": self.set_pose_service, "palletEntities": self.pallet_entities},
             "sensorManifest": self.sensor_manifest(),
             "intendedUse": "Gazebo physics/sensor experiments behind the common Environment Bridge. Simulator-specific APIs remain inside this backend.",
-            "limitations": ["Drive command currently uses the Twist/rear-steer approximation inherited from the ROS2 reference backend.", "Insert/Place remain unavailable until explicit contact-aware manipulation services are implemented."],
+            "limitations": ["The smoke world uses Twist + differential drive only for integration verification; choose a vehicle-appropriate DriveCommandAdapter for forklift dynamics.", "Insert/Place remain unavailable until explicit contact-aware manipulation services are implemented."],
         })
         return base
