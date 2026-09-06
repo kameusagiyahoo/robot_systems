@@ -22,7 +22,7 @@ const GEOMETRY={
 
 export class Browser2DEnvironmentAdapter extends EnvironmentAdapter{
   constructor({canvas=null,store=null,robot=null,renderer=null}={}){
-    super({id:'browser_2d',label:'Browser 2D Smoke-test Environment',version:1,kind:'simulation',fidelity:'smoke_test'});
+    super({id:'browser_2d',label:'Browser 2D Smoke-test Environment',version:2,kind:'simulation',fidelity:'smoke_test'});
     this.store=store||new Store();
     this.robot=robot||new SimRobot(this.store);
     this.renderer=renderer||(canvas?new WarehouseRenderer(canvas):null);
@@ -55,6 +55,13 @@ export class Browser2DEnvironmentAdapter extends EnvironmentAdapter{
   locationApproachTarget(location){return{x:location.x-GEOMETRY.locationApproachOffset,y:location.y}}
   retreatTarget(robot=this.store.state.robot,distanceOverride=GEOMETRY.retreatDistance){const a=deg2rad(robot.yaw);return{x:robot.x-Math.cos(a)*distanceOverride,y:robot.y-Math.sin(a)*distanceOverride}}
   palletVisible(pallet,robot=this.store.state.robot){return distance(robot,pallet)<GEOMETRY.detectionRange}
+  markDetected(palletId){const list=this.store.state.perception.detectedPallets;if(!list.includes(palletId))list.push(palletId);this.store.emit();return{ok:true}}
+  setAligned(value){this.store.state.robot.aligned=!!value;this.store.emit();return{ok:true}}
+  insertForks(palletId){const s=this.store.state;if(!s.pallets[palletId])return{ok:false,reason:'pallet_not_found'};s.robot.carrying=palletId;s.pallets[palletId].status='on_forks';this.store.emit();return{ok:true,message:'forks inserted'}}
+  async setFork(raised){const result=await this.step({type:'fork',raised:!!raised});return result?.ok===false?result:{ok:true,message:raised?'pallet lifted':'fork lowered'}}
+  place(palletId,locationId){const s=this.store.state,l=s.locations[locationId],p=s.pallets[palletId];if(!l)return{ok:false,reason:'location_not_found'};if(!p)return{ok:false,reason:'pallet_not_found'};p.x=l.x;p.y=l.y;p.status='placed';s.robot.carrying=null;s.robot.forkRaised=false;s.robot.aligned=false;this.store.emit();return{ok:true,message:`placed at ${l.label}`}}
+  markRetreated(value=true){this.store.state.agent.memory.retreated=!!value;this.store.emit();return{ok:true}}
+  setAlternateRoute(value=true){this.store.state.agent.memory.alternateRoute=!!value;this.store.emit();return{ok:true}}
 
   getDomainServices(){
     return{
@@ -69,6 +76,13 @@ export class Browser2DEnvironmentAdapter extends EnvironmentAdapter{
       'target.locationApproach':location=>this.locationApproachTarget(location),
       'target.retreat':(robot,distanceOverride)=>this.retreatTarget(robot,distanceOverride),
       'perception.palletVisible':(pallet,robot)=>this.palletVisible(pallet,robot),
+      'perception.markDetected':palletId=>this.markDetected(palletId),
+      'robot.setAligned':value=>this.setAligned(value),
+      'manipulation.insertForks':palletId=>this.insertForks(palletId),
+      'manipulation.setFork':raised=>this.setFork(raised),
+      'manipulation.place':(palletId,locationId)=>this.place(palletId,locationId),
+      'agent.markRetreated':value=>this.markRetreated(value),
+      'agent.setAlternateRoute':value=>this.setAlternateRoute(value),
       'world.distance':(a,b)=>distance(a,b),
       'control.config':()=>this.store.state.simulation
     };
