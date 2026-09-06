@@ -12,10 +12,14 @@ fi
 
 export PYTHONPATH="${REPO_ROOT}:${PYTHONPATH:-}"
 export ROBOT_SYSTEMS_WORLD_JSON="${ROBOT_SYSTEMS_WORLD_JSON:-${SMOKE_DIR}/config/environment.json}"
+export ROBOT_SYSTEMS_ENV_ID="${ROBOT_SYSTEMS_ENV_ID:-gazebo_smoke_forklift}"
+export ROBOT_SYSTEMS_ENV_LABEL="${ROBOT_SYSTEMS_ENV_LABEL:-Gazebo Forklift Integration Smoke}"
+export ROBOT_SYSTEMS_ENV_FIDELITY="${ROBOT_SYSTEMS_ENV_FIDELITY:-integration_smoke}"
 export GAZEBO_WORLD="${GAZEBO_WORLD:-default}"
 export GAZEBO_ROBOT_ENTITY="${GAZEBO_ROBOT_ENTITY:-forklift}"
 export ROBOT_ODOM_TOPIC="${ROBOT_ODOM_TOPIC:-/odom}"
 export ROBOT_CMD_TOPIC="${ROBOT_CMD_TOPIC:-/cmd_vel}"
+export ROBOT_DRIVE_MODE="${ROBOT_DRIVE_MODE:-twist}"
 export ROBOT_RGB_TOPIC="${ROBOT_RGB_TOPIC:-/camera}"
 export ROBOT_LIDAR_TOPIC="${ROBOT_LIDAR_TOPIC:-/scan}"
 export ROBOT_JOINT_STATE_TOPIC="${ROBOT_JOINT_STATE_TOPIC:-}"
@@ -31,9 +35,11 @@ export ROBOT_SYSTEMS_ALLOWED_ORIGINS="${ROBOT_SYSTEMS_ALLOWED_ORIGINS:-http://12
 cat <<EOF
 robot_systems Environment Bridge
   ROS_DISTRO : ${ROS_DISTRO}
+  id         : ${ROBOT_SYSTEMS_ENV_ID}
+  fidelity   : ${ROBOT_SYSTEMS_ENV_FIDELITY}
   world      : ${ROBOT_SYSTEMS_WORLD_JSON}
   odom       : ${ROBOT_ODOM_TOPIC}
-  command    : ${ROBOT_CMD_TOPIC}
+  command    : ${ROBOT_CMD_TOPIC} (${ROBOT_DRIVE_MODE})
   rgb        : ${ROBOT_RGB_TOPIC}
   lidar      : ${ROBOT_LIDAR_TOPIC}
   endpoint   : http://127.0.0.1:${BRIDGE_PORT}/environment
