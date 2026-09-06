@@ -2,6 +2,7 @@ import '../learning/plugins/default_skill_plugins.js';
 import '../environment/default_environments.js';
 import {createEnvironmentAdapter} from '../environment/environment_registry.js';
 import {selectedEnvironmentId} from '../environment/environment_selection.js';
+import {environmentSupportsSkill} from '../environment/environment_capabilities.js';
 import {EnvironmentRulePolicy} from '../policy/environment_rule_policy.js';
 import {SkillExecutor} from '../skills/skills.js';
 import {getSkillDefinition,selectedPolicy,saveSkillEvaluation,loadSkillModel} from '../learning/skill_learning_registry.js';
@@ -29,6 +30,7 @@ export async function evaluateSkill(skillId,{trials=20,seed=42,controller='pure_
   let environmentDescriptor=null;
   for(let i=0;i<n;i++){
     const runtime=await adapter.createRuntime({defaultRuntimeFactory,options});environmentDescriptor=runtime.environmentDescriptor||runtime.environment?.describe?.()||environmentDescriptor;
+    const support=environmentSupportsSkill(environmentDescriptor,skillId);if(!support.ok){try{await runtime.environment?.disconnect?.()}catch{}throw new Error(`environment_skill_unsupported:${environmentDescriptor?.remoteEnvironmentId||environmentDescriptor?.id||resolvedEnvironmentId}:${skillId}:${support.missing.join(',')}`)}
     try{
       const s=runtime.environment?.getState?.()||runtime.store.state,prepared=await adapter.prepareTrial(skillId,s,rng,{index:i,options,runtime});let result;
       try{result=await runtime.executor.execute(prepared.step)}catch(error){result={ok:false,reason:`exception:${error?.message||'unknown'}`}}
