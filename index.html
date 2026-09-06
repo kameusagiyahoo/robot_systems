@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>Forklift Agent Lab v2.6</title>
+  <title>Forklift Agent Lab v3.0</title>
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
 <header class="mobile-header">
-  <div><strong>Forklift Agent Lab</strong><span>Skill Learning Framework v2.6</span></div>
+  <div><strong>Forklift Agent Lab</strong><span>Environment Adapter + Skill Learning v3.0</span></div>
   <div id="statusBadge" class="status-badge idle">待機中</div>
 </header>
 
@@ -20,96 +20,71 @@
   </section>
 
   <section class="result-strip">
-    <div class="result-main">
-      <strong id="statusGuide">タスクを入力して実行してください。</strong>
-      <div id="failureSummary" class="failure-inline hidden">失敗: <code id="failureReason">-</code></div>
-    </div>
+    <div class="result-main"><strong id="statusGuide">タスクを入力して実行してください。</strong><div id="failureSummary" class="failure-inline hidden">失敗: <code id="failureReason">-</code></div></div>
     <button id="copyDebugBtn" class="copy-btn compact">診断コピー</button>
   </section>
 
   <section class="pipeline-panel">
-    <div class="pipeline-head">
-      <div><strong>Task Pipeline</strong><span id="pipelineTaskName">パレット搬送</span></div>
-      <span id="pipelineLearnedSummary" class="learned-summary">学習 / 評価</span>
-    </div>
+    <div class="pipeline-head"><div><strong>Task Pipeline</strong><span id="pipelineTaskName">パレット搬送</span></div><span id="pipelineLearnedSummary" class="learned-summary">学習 / 評価</span></div>
     <div id="taskPipeline" class="task-pipeline"></div>
   </section>
 
-  <section class="sim-panel">
-    <canvas id="simCanvas" width="900" height="560" aria-label="warehouse simulator"></canvas>
-  </section>
+  <section class="sim-panel"><canvas id="simCanvas" width="900" height="560" aria-label="browser 2D smoke-test environment"></canvas></section>
 </main>
 
 <nav class="bottom-nav" aria-label="補助メニュー">
   <button data-open-sheet="learnSheet"><span>Skill</span><small>学習・評価</small></button>
   <button data-open-sheet="logSheet"><span>ログ</span><small>原因</small></button>
-  <button data-open-sheet="settingsSheet"><span>研究設定</span><small>比較・記録</small></button>
+  <button data-open-sheet="settingsSheet"><span>研究設定</span><small>環境・記録</small></button>
 </nav>
 
-<div class="runtime-hidden" aria-hidden="true">
-  <span id="statusTask"></span><span id="statusController"></span><span id="statusStep"></span><span id="statusCollision"></span>
-</div>
+<div class="runtime-hidden" aria-hidden="true"><span id="statusTask"></span><span id="statusController"></span><span id="statusStep"></span><span id="statusCollision"></span></div>
 
 <dialog id="learnSheet" class="bottom-sheet">
   <div class="sheet-head"><div><small>Taskを構成するSkillごとに管理</small><h2>Skill Learning / Evaluation</h2></div><button data-close-sheet>×</button></div>
-  <div class="sheet-body">
-    <p class="sheet-note">各Skillごとに学習状態と単体評価結果を確認できます。「評価」でそのSkillだけを複数条件でテストします。</p>
-    <div id="learningSkillList" class="learning-skill-list"></div>
-  </div>
+  <div class="sheet-body"><p class="sheet-note">各Skillごとに学習状態と単体評価結果を確認できます。「評価」でそのSkillだけを複数条件でテストします。</p><div id="learningSkillList" class="learning-skill-list"></div></div>
 </dialog>
 
 <dialog id="logSheet" class="bottom-sheet">
   <div class="sheet-head"><div><small>失敗したときに見る</small><h2>Agent Log</h2></div><button data-close-sheet>×</button></div>
-  <div class="sheet-body log-sheet-body">
-    <div class="sheet-actions"><button class="copy-btn" data-copy-target="log">ログをコピー</button><button id="clearLogBtn">Clear</button></div>
-    <div id="log" class="log"></div>
-  </div>
+  <div class="sheet-body log-sheet-body"><div class="sheet-actions"><button class="copy-btn" data-copy-target="log">ログをコピー</button><button id="clearLogBtn">Clear</button></div><div id="log" class="log"></div></div>
 </dialog>
 
 <dialog id="settingsSheet" class="bottom-sheet tall-sheet">
-  <div class="sheet-head"><div><small>通常は触らなくてOK</small><h2>研究者向け設定</h2></div><button data-close-sheet>×</button></div>
+  <div class="sheet-head"><div><small>実験条件とAdapter</small><h2>研究者向け設定</h2></div><button data-close-sheet>×</button></div>
   <div class="sheet-body settings-scroll">
     <details open>
+      <summary>Environment Adapter</summary>
+      <p class="sheet-note">上位のTask / Planner / Skill / Learningから実行環境を分離します。Browser 2DはUI・契約・動作確認用のSmoke Testであり、高忠実度シミュレータとして扱いません。</p>
+      <div class="form-grid"><label>Environment<select id="environmentSelect"></select></label></div>
+      <p id="environmentState" class="sheet-note">Environmentを読み込み中...</p>
+    </details>
+
+    <details open>
       <summary>Demonstration Recorder / 手動操作</summary>
-      <p class="sheet-note">記録対象Skillを選び、「記録開始」後に方向ボタンを長押しします。1回の開始〜停止を1 Episodeとして保存し、Outcome / Quality / NoteはSkill学習画面で編集できます。</p>
-      <div class="form-grid">
-        <label>記録するSkill<select id="demoSkill"></select></label>
-        <label class="demo-replace-label"><span>Dataset</span><span><input id="demoReplaceToggle" type="checkbox"> 既存デモを置換</span></label>
-      </div>
-      <div class="sheet-actions">
-        <button id="demoRecordBtn" class="primary">● 記録開始</button>
-        <button id="demoStopBtn" disabled>■ 保存して停止</button>
-        <button id="demoDiscardBtn" disabled>破棄</button>
-      </div>
+      <p class="sheet-note">記録対象Skillを選び、「記録開始」後に方向ボタンを長押しします。1回の開始〜停止を1 Episodeとして保存し、Outcome / Quality / NoteはSkill学習画面で編集できます。記録元EnvironmentもDataset metadataへ保存します。</p>
+      <div class="form-grid"><label>記録するSkill<select id="demoSkill"></select></label><label class="demo-replace-label"><span>Dataset</span><span><input id="demoReplaceToggle" type="checkbox"> 既存デモを置換</span></label></div>
+      <div class="sheet-actions"><button id="demoRecordBtn" class="primary">● 記録開始</button><button id="demoStopBtn" disabled>■ 保存して停止</button><button id="demoDiscardBtn" disabled>破棄</button></div>
       <div id="demoRecordState" class="demo-record-state">Recorder: 待機中</div>
-      <div class="manual-controls">
-        <button data-manual="forward">↑ 前進</button>
-        <button data-manual="left">← 左</button>
-        <button data-manual="right">右 →</button>
-        <button data-manual="back">↓ 後退</button>
-        <button data-manual="lift">Fork</button>
-      </div>
+      <div class="manual-controls"><button data-manual="forward">↑ 前進</button><button data-manual="left">← 左</button><button data-manual="right">右 →</button><button data-manual="back">↓ 後退</button><button data-manual="lift">Fork</button></div>
       <div class="sheet-actions"><button id="stepBtn">1 Step</button><button id="planBtn">Task解析</button></div>
     </details>
 
     <details>
       <summary>Controller</summary>
-      <div class="form-grid">
-        <label>方式<select id="controllerSelect"><option value="pure_pursuit">Pure Pursuit</option><option value="rule_waypoint">Rule Waypoint</option><option value="pid_path">PID Path</option></select></label>
-        <label>Lookahead<input id="lookaheadInput" type="number" min="20" max="120" step="5" value="55"></label>
-      </div>
+      <div class="form-grid"><label>方式<select id="controllerSelect"><option value="pure_pursuit">Pure Pursuit</option><option value="rule_waypoint">Rule Waypoint</option><option value="pid_path">PID Path</option></select></label><label>Lookahead<input id="lookaheadInput" type="number" min="20" max="120" step="5" value="55"></label></div>
       <details class="nested-details"><summary>PID tuning</summary><div class="form-grid"><label>Kp<input id="pidKp" type="number" step="0.05" value="0.8"></label><label>Ki<input id="pidKi" type="number" step="0.01" value="0.01"></label><label>Kd<input id="pidKd" type="number" step="0.01" value="0.18"></label><label>CTE gain<input id="pidCte" type="number" step="0.1" value="1.2"></label></div></details>
     </details>
 
     <details><summary>Failure Lab</summary><div class="toggle-list"><label><input id="obstacleToggle" type="checkbox"> 障害物</label><label><input id="detectFailToggle" type="checkbox"> 検出を強制失敗</label><label><input id="alignFailToggle" type="checkbox"> 位置合わせを強制失敗</label><label><input id="insertFailToggle" type="checkbox"> 差し込みを強制失敗</label></div></details>
 
-    <details><summary>Benchmark</summary><div class="form-grid"><label>Seed<input id="benchmarkSeed" type="text" value="42"></label><label>Scenarios<input id="benchmarkScenarios" type="number" min="1" max="50" value="8"></label></div><div class="sheet-actions"><button id="batchBtn" class="primary">実行</button><button id="benchmarkJsonBtn">JSON</button><button id="benchmarkCsvBtn">CSV</button><button class="copy-btn" data-copy-target="batchState">コピー</button></div><pre id="batchState" class="data-box small">No benchmark result yet.</pre></details>
+    <details><summary>Benchmark</summary><p class="sheet-note">Benchmark結果にはEnvironment ID/version/fidelityも保存します。</p><div class="form-grid"><label>Seed<input id="benchmarkSeed" type="text" value="42"></label><label>Scenarios<input id="benchmarkScenarios" type="number" min="1" max="50" value="8"></label></div><div class="sheet-actions"><button id="batchBtn" class="primary">実行</button><button id="benchmarkJsonBtn">JSON</button><button id="benchmarkCsvBtn">CSV</button><button class="copy-btn" data-copy-target="batchState">コピー</button></div><pre id="batchState" class="data-box small">No benchmark result yet.</pre></details>
 
     <details><summary>内部データ</summary>
       <h3>Episode</h3><div class="sheet-actions"><button class="copy-btn" data-copy-target="episodeState">コピー</button><button id="downloadEpisodeBtn">JSON保存</button></div><pre id="episodeState" class="data-box"></pre>
       <h3>Decision History</h3><div id="skillQueue" class="skill-queue"></div>
       <h3>Agent State</h3><button class="copy-btn" data-copy-target="agentState">コピー</button><pre id="agentState" class="data-box"></pre>
-      <h3>Robot State</h3><button class="copy-btn" data-copy-target="robotState">コピー</button><pre id="robotState" class="data-box"></pre>
+      <h3>Robot / Environment State</h3><button class="copy-btn" data-copy-target="robotState">コピー</button><pre id="robotState" class="data-box"></pre>
     </details>
   </div>
 </dialog>
