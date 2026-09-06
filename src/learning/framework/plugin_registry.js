@@ -27,5 +27,7 @@ export function getLearningPluginId(skillId){return bindings.get(skillId)||null}
 export function getRuntimePolicyAdapter(skillId){return getLearningPlugin(skillId).getRuntimePolicyAdapter(skillId)}
 export function getEvaluationScenarioAdapter(skillId){return getLearningPlugin(skillId).getEvaluationScenarioAdapter(skillId)}
 export function getDemonstrationRecorderAdapter(skillId){return getLearningPlugin(skillId).getDemonstrationRecorderAdapter(skillId)}
+export function getSensorSourceAdapter(skillId){return getLearningPlugin(skillId).getSensorSourceAdapter(skillId)}
+export function getInferenceBackend(skillId){return getLearningPlugin(skillId).getInferenceBackend(skillId)}
 export function listLearningPlugins(){return[...plugins.values()].map(p=>({id:p.id,label:p.label,version:p.version}))}
 export function listSkillPluginBindings(){return[...bindings.entries()].map(([skillId,pluginId])=>({skillId,pluginId}))}
