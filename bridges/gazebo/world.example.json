@@ -1,0 +1,12 @@
+{
+  "robot": {"x": 0.0, "y": 0.0, "yaw": 0.0},
+  "pallets": {
+    "pallet_A": {"label": "Pallet A", "x": 4.0, "y": 1.0, "yaw": 0.0, "status": "waiting"}
+  },
+  "palletEntities": {
+    "pallet_A": "pallet_A"
+  },
+  "locations": {
+    "shipping": {"label": "Shipping", "x": 8.0, "y": 3.0}
+  }
+}
