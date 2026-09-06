@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from copy import deepcopy
 import math
+import time
 from typing import Any, Dict
 
-from .environment_bridge_core import EnvironmentBackend
+from .environment_bridge_core import EnvironmentBackend, SENSOR_PACKET_SCHEMA
 
 
 class MockEnvironmentBackend(EnvironmentBackend):
@@ -12,7 +13,7 @@ class MockEnvironmentBackend(EnvironmentBackend):
 
     environment_id = "mock_bridge_environment"
     label = "Mock Bridge Environment"
-    version = 1
+    version = 2
     kind = "simulation"
     fidelity = "protocol_smoke_test"
 
@@ -22,6 +23,7 @@ class MockEnvironmentBackend(EnvironmentBackend):
             "pallets": {"pallet_A": {"id": "pallet_A", "label": "Pallet A", "x": 4.0, "y": 2.0, "status": "available"}},
             "locations": {"shipping": {"id": "shipping", "label": "Shipping", "x": 8.0, "y": 5.0}},
             "perception": {"detectedPallets": []},
+            "sensors": {"rgb": {"sensorId": "rgb", "type": "rgb", "available": True}},
             "obstacle": {"enabled": False},
             "failures": {},
             "path": {"active": False, "index": 0, "waypoints": [], "densePoints": [], "lookaheadTarget": None},
@@ -36,8 +38,8 @@ class MockEnvironmentBackend(EnvironmentBackend):
             "units": {"length": "m", "time": "s", "speed": "m/s"},
             "semanticGeometry": {"palletPreAlign": 2.4, "palletStaging": 1.8, "palletDock": 1.25, "locationApproach": 1.2, "retreatDistance": 1.2, "detectionRange": 3.0},
             "intendedUse": "Bridge protocol smoke testing only",
-            "capabilities": {**base["capabilities"], "reset": True, "trialConfiguration": True, "scenarios": True, "pose2d": True, "pose3d": False, "rgb": False, "depth": False, "lidar": False, "contact": False, "jointState": False, "forkActuation": True, "palletManipulation": True, "teleport": True, "domainServices": list(self.domain_services())},
-            "limitations": ["not a physics simulator", "no sensor physics", "no contact physics"],
+            "capabilities": {**base["capabilities"], "reset": True, "trialConfiguration": True, "scenarios": True, "batch": True, "pose2d": True, "pose3d": False, "rgb": True, "depth": False, "lidar": False, "contact": False, "jointState": False, "forkActuation": True, "palletManipulation": True, "teleport": True, "sensorRead": True, "domainServices": list(self.domain_services())},
+            "limitations": ["not a physics simulator", "fake RGB packet only", "no contact physics"],
         })
         return base
 
@@ -99,6 +101,14 @@ class MockEnvironmentBackend(EnvironmentBackend):
     def metrics(self):
         sim = self._state["simulation"]
         return {"pathLength": sim["pathLength"], "controlTicks": sim["controlTicks"], "collisions": sim["collisions"], "simTimeSec": sim["controlTicks"] * sim["dt"]}
+
+    def sensor_manifest(self):
+        return [{"sensorId": "rgb", "type": "rgb", "frame": "mock_camera", "available": True, "transport": "environment_bridge.sensor_read"}]
+
+    def read_sensor(self, sensor_id, options):
+        if sensor_id != "rgb":
+            raise RuntimeError(f"sensor_read_not_supported:{sensor_id}")
+        return {"schema": SENSOR_PACKET_SCHEMA, "sensorId": "rgb", "type": "rgb", "frame": "mock_camera", "timestamp": time.time(), "encoding": "mock-json", "shape": [1, 1, 3], "data": None if (options or {}).get("metadataOnly") else [255, 0, 0], "meta": {"smokeTest": True}}
 
     def domain_services(self):
         return ["manipulation.insertForks", "manipulation.setFork", "manipulation.place"]
