@@ -2,17 +2,19 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>Skill Learning Framework v3.0</title><link rel="stylesheet" href="./style.css"><link rel="stylesheet" href="./learning_framework.css">
+  <title>Skill Learning Framework v3.1</title><link rel="stylesheet" href="./style.css"><link rel="stylesheet" href="./learning_framework.css">
   <style>.demo-episode-list{display:grid;gap:6px;margin-top:7px}.demo-episode-row{background:#fff;border:1px solid #dce4e9;border-radius:8px;padding:7px}.demo-episode-head{display:flex;justify-content:space-between;gap:6px;align-items:center;margin-bottom:6px}.demo-episode-head strong{font-size:.64rem;overflow-wrap:anywhere}.demo-episode-head span{font-size:.55rem;color:#7b8790;text-align:right}.demo-episode-controls{display:grid;grid-template-columns:1fr 1fr minmax(90px,1.4fr) auto;gap:5px}.demo-episode-controls select,.demo-episode-controls input{min-width:0;width:100%;height:32px;border:1px solid #cbd6dd;border-radius:7px;padding:4px;font-size:.6rem;background:#fff}.episode-delete{height:32px;padding:4px 7px;font-size:.6rem;color:#a11d14;border-color:#efafa8;background:#fff0ee}@media(max-width:520px){.demo-episode-controls{grid-template-columns:1fr 1fr}.demo-episode-controls input{grid-column:1/-1}.episode-delete{grid-column:1/-1}.demo-episode-head{align-items:flex-start;flex-direction:column}.demo-episode-head span{text-align:left}}</style>
 </head>
 <body><div class="learn-screen">
-<header class="learn-top"><div><strong>Skill Learning Framework</strong> <span>v3.0 · Environment-independent I/O</span></div><a class="back-link" href="./index.html">← Task</a></header>
+<header class="learn-top"><div><strong>Skill Learning Framework</strong> <span>v3.1 · Environment / Sensor independent</span></div><a class="back-link" href="./index.html">← Task</a></header>
 <main class="learn-main">
 <section class="skill-focus"><div><small>Task Pipeline / Skill</small><h1 id="skillTitle">読み込み中...</h1><p id="skillDesc"></p></div><div id="skillNumber" class="skill-number">- / 8</div></section>
 <section class="learn-status"><div id="learnIndicator" class="learn-indicator">－</div><div><h2 id="learnTitle">確認中...</h2><p id="learnMessage"></p><div id="trainingNote" class="training-note hidden">学習中...</div><button id="cancelTrainBtn" class="cancel-training hidden">学習をキャンセル</button></div></section>
 <section class="learning-grid">
 <div class="learning-item"><span>Learning Plugin</span><strong id="pluginState">-</strong></div>
 <div class="learning-item"><span>Skill I/O Adapter</span><strong id="ioAdapterState">-</strong></div>
+<div class="learning-item"><span>Sensor Source Adapter</span><strong id="sensorSourceState">-</strong></div>
+<div class="learning-item"><span>Inference Backend</span><strong id="inferenceBackendState">-</strong></div>
 <div class="learning-item"><span>Observation Space</span><strong id="observationSpaceState">-</strong></div>
 <div class="learning-item"><span>Action Space</span><strong id="actionSpaceState">-</strong></div>
 <div class="learning-item"><span>Runtime Adapter</span><strong id="runtimeAdapterState">-</strong></div>
