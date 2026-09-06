@@ -16,6 +16,19 @@ def _load_world():
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
+def _apply_descriptor_overrides(backend):
+    fidelity = os.environ.get("ROBOT_SYSTEMS_ENV_FIDELITY", "").strip()
+    label = os.environ.get("ROBOT_SYSTEMS_ENV_LABEL", "").strip()
+    environment_id = os.environ.get("ROBOT_SYSTEMS_ENV_ID", "").strip()
+    if fidelity:
+        backend.fidelity = fidelity
+    if label:
+        backend.label = label
+    if environment_id:
+        backend.environment_id = environment_id
+    return backend
+
+
 def build_backend():
     world = _load_world()
     backend = GazeboRos2ForkliftBackend(
@@ -45,6 +58,7 @@ def build_backend():
         max_reverse_speed=float(os.environ.get("ROBOT_MAX_REVERSE_SPEED", "1.0")),
         max_steering_angle_deg=float(os.environ.get("ROBOT_MAX_STEERING_DEG", "35")),
     )
+    backend = _apply_descriptor_overrides(backend)
     perception_url = os.environ.get("ROBOT_SYSTEMS_PERCEPTION_URL", "").strip()
     if perception_url:
         provider = HttpPerceptionInferenceProvider(
