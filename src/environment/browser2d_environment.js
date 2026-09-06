@@ -22,7 +22,7 @@ const GEOMETRY={
 
 export class Browser2DEnvironmentAdapter extends EnvironmentAdapter{
   constructor({canvas=null,store=null,robot=null,renderer=null}={}){
-    super({id:'browser_2d',label:'Browser 2D Smoke-test Environment',version:2,kind:'simulation',fidelity:'smoke_test'});
+    super({id:'browser_2d',label:'Browser 2D Smoke-test Environment',version:3,kind:'simulation',fidelity:'smoke_test'});
     this.store=store||new Store();
     this.robot=robot||new SimRobot(this.store);
     this.renderer=renderer||(canvas?new WarehouseRenderer(canvas):null);
@@ -42,6 +42,21 @@ export class Browser2DEnvironmentAdapter extends EnvironmentAdapter{
   getMetrics(){const s=this.store.state,sim=s.simulation||{};return{pathLength:sim.pathLength||0,controlTicks:sim.controlTicks||0,simTimeSec:(sim.controlTicks||0)*(sim.dt||0),collisions:sim.collisions||0,vehicleModel:sim.vehicleModel||null,controller:sim.controller||null}}
   generateScenarios(seed,count){return generateScenarios(seed,count)}
   applyScenario(scenario){applyScenario(this.store.state,scenario);this.store.emit();return this.store.state}
+  async configureTrial(spec={}){
+    const s=this.store.state;
+    if(spec.reset!==false){
+      s.simulation.pathLength=0;s.simulation.controlTicks=0;s.simulation.collisions=0;s.path={active:false,index:0,waypoints:[],densePoints:[],lookaheadTarget:null};
+      s.perception.detectedPallets=[];s.robot.speed=0;s.robot.angularVelocity=0;s.robot.steeringAngle=0;s.robot.aligned=false;s.robot.forkRaised=false;s.robot.carrying=null;
+    }
+    if(spec.robot)Object.assign(s.robot,{...spec.robot,yaw:Number.isFinite(Number(spec.robot.yaw))?(Number(spec.robot.yaw)+360)%360:s.robot.yaw});
+    for(const [id,patch] of Object.entries(spec.pallets||{}))if(s.pallets[id])Object.assign(s.pallets[id],patch);
+    for(const [id,patch] of Object.entries(spec.locations||{}))if(s.locations[id])Object.assign(s.locations[id],patch);
+    if(spec.obstacle)Object.assign(s.obstacle,spec.obstacle);
+    if(spec.perception?.detectedPallets)s.perception.detectedPallets=[...spec.perception.detectedPallets];
+    if(spec.failures)Object.assign(s.failures,spec.failures);
+    if(spec.agentMemory)Object.assign(s.agent.memory,spec.agentMemory);
+    this.store.emit();return s;
+  }
   taskTextForScenario(scenario){return taskTextForScenario(scenario)}
 
   pathTo(target){
@@ -70,6 +85,7 @@ export class Browser2DEnvironmentAdapter extends EnvironmentAdapter{
       'action.send':action=>this.step(action),
       'metrics.get':()=>this.getMetrics(),
       'environment.describe':()=>this.describe(),
+      'scenario.configure':spec=>this.configureTrial(spec),
       'path.to':target=>this.pathTo(target),
       'path.palletApproach':pallet=>this.palletApproachPath(pallet),
       'target.palletDock':pallet=>this.palletDockTarget(pallet),
