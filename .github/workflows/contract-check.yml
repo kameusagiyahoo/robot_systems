@@ -1,0 +1,51 @@
+name: Contract Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Python syntax
+        run: python -m compileall -q bridges
+
+      - name: Environment bridge unit tests
+        run: python -m unittest -v bridges.python.test_environment_bridge_core
+
+      - name: JavaScript module syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            app.js pipeline.js mobile_ui.js
+            src/environment/*.js
+            src/evaluation/*.js
+            src/policy/*.js
+            src/skills/*.js
+            src/learning/framework/*.js
+            src/learning/plugins/*.js
+            src/learning/algorithms/*.js
+            src/learning/ui/*.js
+            src/learning/workers/*.js
+          )
+          for file in "${files[@]}"; do
+            [ -f "$file" ] || continue
+            echo "check $file"
+            node --input-type=module --check < "$file"
+          done
