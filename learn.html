@@ -1,46 +1,40 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>Skill Learning Framework v2.6</title>
-  <link rel="stylesheet" href="./style.css">
-  <link rel="stylesheet" href="./learning_framework.css">
-  <style>
-    .demo-episode-list{display:grid;gap:6px;margin-top:7px}.demo-episode-row{background:#fff;border:1px solid #dce4e9;border-radius:8px;padding:7px}.demo-episode-head{display:flex;justify-content:space-between;gap:6px;align-items:center;margin-bottom:6px}.demo-episode-head strong{font-size:.64rem;overflow-wrap:anywhere}.demo-episode-head span{font-size:.55rem;color:#7b8790;text-align:right}.demo-episode-controls{display:grid;grid-template-columns:1fr 1fr minmax(90px,1.4fr) auto;gap:5px}.demo-episode-controls select,.demo-episode-controls input{min-width:0;width:100%;height:32px;border:1px solid #cbd6dd;border-radius:7px;padding:4px;font-size:.6rem;background:#fff}.episode-delete{height:32px;padding:4px 7px;font-size:.6rem;color:#a11d14;border-color:#efafa8;background:#fff0ee}@media(max-width:520px){.demo-episode-controls{grid-template-columns:1fr 1fr}.demo-episode-controls input{grid-column:1/-1}.episode-delete{grid-column:1/-1}.demo-episode-head{align-items:flex-start;flex-direction:column}.demo-episode-head span{text-align:left}}
-  </style>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Skill Learning Framework v3.0</title><link rel="stylesheet" href="./style.css"><link rel="stylesheet" href="./learning_framework.css">
+  <style>.demo-episode-list{display:grid;gap:6px;margin-top:7px}.demo-episode-row{background:#fff;border:1px solid #dce4e9;border-radius:8px;padding:7px}.demo-episode-head{display:flex;justify-content:space-between;gap:6px;align-items:center;margin-bottom:6px}.demo-episode-head strong{font-size:.64rem;overflow-wrap:anywhere}.demo-episode-head span{font-size:.55rem;color:#7b8790;text-align:right}.demo-episode-controls{display:grid;grid-template-columns:1fr 1fr minmax(90px,1.4fr) auto;gap:5px}.demo-episode-controls select,.demo-episode-controls input{min-width:0;width:100%;height:32px;border:1px solid #cbd6dd;border-radius:7px;padding:4px;font-size:.6rem;background:#fff}.episode-delete{height:32px;padding:4px 7px;font-size:.6rem;color:#a11d14;border-color:#efafa8;background:#fff0ee}@media(max-width:520px){.demo-episode-controls{grid-template-columns:1fr 1fr}.demo-episode-controls input{grid-column:1/-1}.episode-delete{grid-column:1/-1}.demo-episode-head{align-items:flex-start;flex-direction:column}.demo-episode-head span{text-align:left}}</style>
 </head>
-<body>
-<div class="learn-screen">
-  <header class="learn-top"><div><strong>Skill Learning Framework</strong> <span>v2.6</span></div><a class="back-link" href="./index.html">← Task</a></header>
-  <main class="learn-main">
-    <section class="skill-focus"><div><small>Task Pipeline / Skill</small><h1 id="skillTitle">読み込み中...</h1><p id="skillDesc"></p></div><div id="skillNumber" class="skill-number">- / 8</div></section>
-    <section class="learn-status"><div id="learnIndicator" class="learn-indicator">－</div><div><h2 id="learnTitle">確認中...</h2><p id="learnMessage"></p><div id="trainingNote" class="training-note hidden">学習中...</div><button id="cancelTrainBtn" class="cancel-training hidden">学習をキャンセル</button></div></section>
-    <section class="learning-grid">
-      <div class="learning-item"><span>Learning Plugin</span><strong id="pluginState">-</strong></div>
-      <div class="learning-item"><span>Runtime Adapter</span><strong id="runtimeAdapterState">-</strong></div>
-      <div class="learning-item"><span>Evaluation Scenario</span><strong id="scenarioAdapterState">-</strong></div>
-      <div class="learning-item"><span>Training Backend</span><strong id="trainingBackendState">-</strong></div>
-      <div class="learning-item"><span>Dataset Adapter</span><strong id="datasetAdapterState">-</strong></div>
-      <div class="learning-item"><span>Demo Recorder</span><strong id="demoRecorderState">-</strong></div>
-      <div class="learning-item"><span>Policy</span><strong id="policyState">-</strong><div id="policyButtons" class="policy-buttons"></div></div>
-      <div class="learning-item"><span>Algorithm</span><strong id="algorithmState">-</strong></div>
-      <div class="learning-item"><span>Dataset Schema</span><strong id="datasetSchema">-</strong></div>
-      <div class="learning-item"><span>Dataset</span><strong id="datasetState">-</strong></div>
-      <div class="learning-item"><span>Model</span><strong id="modelState">-</strong></div>
-      <div class="learning-item"><span>Model ID</span><strong id="modelIdState">-</strong></div>
-      <div class="learning-item"><span>Training</span><strong id="trainingState">-</strong></div>
-      <div class="learning-item"><span>Evaluation</span><strong id="evaluationState">未実施</strong></div>
-      <div class="learning-item full"><span>Training Parameters</span><div id="trainingParameters" class="plugin-parameters"></div></div>
-      <div id="episodeCard" class="learning-item full"><span>Demonstration Episodes</span><p id="episodeSummary" class="learning-note">Episodeを読み込み中...</p><div id="episodeHost" class="demo-episode-list"></div></div>
-      <div id="datasetToolsCard" class="learning-item full"><span>Dataset Tools</span><div class="dataset-tools"><input id="datasetImportInput" type="file" accept="application/json,.json" hidden><button id="datasetImportBtn">JSON Import</button><button id="datasetExportBtn">Portable JSON</button><button id="lerobotExportBtn">LeRobot中間JSON</button></div><p id="datasetToolState" class="learning-note"></p></div>
-      <div class="learning-item full"><span>Skill Learning Package</span><div class="package-tools"><input id="packageImportInput" type="file" accept="application/json,.json" hidden><button id="packageExportBtn">Package Export</button><button id="packageImportBtn">Package Import</button></div><p id="packageState" class="learning-note">Model / Dataset / Policy / Evaluation履歴を1ファイルで保存します。</p></div>
-      <div class="learning-item full"><span>Visualization Adapter</span><div id="visualizationHost" class="plugin-viz-host"></div></div>
-      <div class="learning-item full"><span>このSkill / Pluginについて</span><p id="skillNote" class="learning-note"></p></div>
-    </section>
-  </main>
-  <footer class="learn-actions"><button id="trainBtn" class="primary-action">このSkillを学習</button><a id="evalLink" class="eval-link" href="#">評価 / 比較</a><a class="go-main" href="./index.html">メインで確認</a><button id="nextBtn">次のSkill →</button><button id="clearBtn">モデル削除</button></footer>
-</div>
-<script type="module" src="./src/learning/ui/learning_page.js"></script>
-</body>
-</html>
+<body><div class="learn-screen">
+<header class="learn-top"><div><strong>Skill Learning Framework</strong> <span>v3.0 · Environment-independent I/O</span></div><a class="back-link" href="./index.html">← Task</a></header>
+<main class="learn-main">
+<section class="skill-focus"><div><small>Task Pipeline / Skill</small><h1 id="skillTitle">読み込み中...</h1><p id="skillDesc"></p></div><div id="skillNumber" class="skill-number">- / 8</div></section>
+<section class="learn-status"><div id="learnIndicator" class="learn-indicator">－</div><div><h2 id="learnTitle">確認中...</h2><p id="learnMessage"></p><div id="trainingNote" class="training-note hidden">学習中...</div><button id="cancelTrainBtn" class="cancel-training hidden">学習をキャンセル</button></div></section>
+<section class="learning-grid">
+<div class="learning-item"><span>Learning Plugin</span><strong id="pluginState">-</strong></div>
+<div class="learning-item"><span>Skill I/O Adapter</span><strong id="ioAdapterState">-</strong></div>
+<div class="learning-item"><span>Observation Space</span><strong id="observationSpaceState">-</strong></div>
+<div class="learning-item"><span>Action Space</span><strong id="actionSpaceState">-</strong></div>
+<div class="learning-item"><span>Runtime Adapter</span><strong id="runtimeAdapterState">-</strong></div>
+<div class="learning-item"><span>Evaluation Scenario</span><strong id="scenarioAdapterState">-</strong></div>
+<div class="learning-item"><span>Training Backend</span><strong id="trainingBackendState">-</strong></div>
+<div class="learning-item"><span>Dataset Adapter</span><strong id="datasetAdapterState">-</strong></div>
+<div class="learning-item"><span>Demo Recorder</span><strong id="demoRecorderState">-</strong></div>
+<div class="learning-item"><span>Policy</span><strong id="policyState">-</strong><div id="policyButtons" class="policy-buttons"></div></div>
+<div class="learning-item"><span>Algorithm</span><strong id="algorithmState">-</strong></div>
+<div class="learning-item"><span>Dataset Schema</span><strong id="datasetSchema">-</strong></div>
+<div class="learning-item"><span>Dataset</span><strong id="datasetState">-</strong></div>
+<div class="learning-item"><span>Model</span><strong id="modelState">-</strong></div>
+<div class="learning-item"><span>Model ID</span><strong id="modelIdState">-</strong></div>
+<div class="learning-item"><span>I/O Compatibility</span><strong id="ioCompatibilityState">-</strong></div>
+<div class="learning-item"><span>Training</span><strong id="trainingState">-</strong></div>
+<div class="learning-item"><span>Evaluation</span><strong id="evaluationState">未実施</strong></div>
+<div class="learning-item full"><span>Training Parameters</span><div id="trainingParameters" class="plugin-parameters"></div></div>
+<div id="episodeCard" class="learning-item full"><span>Demonstration Episodes</span><p id="episodeSummary" class="learning-note">Episodeを読み込み中...</p><div id="episodeHost" class="demo-episode-list"></div></div>
+<div id="datasetToolsCard" class="learning-item full"><span>Dataset Tools</span><div class="dataset-tools"><input id="datasetImportInput" type="file" accept="application/json,.json" hidden><button id="datasetImportBtn">JSON Import</button><button id="datasetExportBtn">Portable JSON</button><button id="lerobotExportBtn">LeRobot中間JSON</button></div><p id="datasetToolState" class="learning-note"></p></div>
+<div class="learning-item full"><span>Skill Learning Package</span><div class="package-tools"><input id="packageImportInput" type="file" accept="application/json,.json" hidden><button id="packageExportBtn">Package Export</button><button id="packageImportBtn">Package Import</button></div><p id="packageState" class="learning-note">Model / Dataset / Policy / Evaluation履歴を1ファイルで保存します。</p></div>
+<div class="learning-item full"><span>Visualization Adapter</span><div id="visualizationHost" class="plugin-viz-host"></div></div>
+<div class="learning-item full"><span>このSkill / Pluginについて</span><p id="skillNote" class="learning-note"></p></div>
+</section></main>
+<footer class="learn-actions"><button id="trainBtn" class="primary-action">このSkillを学習</button><a id="evalLink" class="eval-link" href="#">評価 / 比較</a><a class="go-main" href="./index.html">メインで確認</a><button id="nextBtn">次のSkill →</button><button id="clearBtn">モデル削除</button></footer>
+</div><script type="module" src="./src/learning/ui/learning_page.js"></script></body></html>
