@@ -2,7 +2,7 @@ import {registerEnvironmentAdapter} from './environment_registry.js';
 import {Browser2DEnvironmentAdapter} from './browser2d_environment.js';
 
 registerEnvironmentAdapter({
-  id:'browser_2d',label:'Browser 2D Smoke Test',version:3,kind:'simulation',fidelity:'smoke_test',tags:['default','browser'],
+  id:'browser_2d',label:'Browser 2D Smoke Test',version:4,kind:'simulation',fidelity:'smoke_test',tags:['default','browser'],
   factory:options=>new Browser2DEnvironmentAdapter(options)
 });
 
