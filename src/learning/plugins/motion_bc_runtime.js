@@ -7,7 +7,7 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
 const REFERENCE_WHEELBASE=52;
 
 export class MotionBehaviorCloningRuntimeAdapter extends SkillRuntimePolicyAdapter{
-  constructor(ioAdapter=motionSkillIOAdapter){super({id:'motion_bc_runtime',label:'Motion BC Runtime',version:6});this.ioAdapter=ioAdapter}
+  constructor(ioAdapter=motionSkillIOAdapter){super({id:'motion_bc_runtime',label:'Motion BC Runtime',version:7});this.ioAdapter=ioAdapter}
   supports(skillId,policy='learned'){return policy==='learned'&&['navigate_to_pallet','align_to_pallet','navigate_to','retreat'].includes(skillId)}
   getRequiredDomainServices(skillId){const common=['state.get','action.send','control.config'];if(skillId==='navigate_to_pallet')return[...common,'path.palletApproach'];if(skillId==='navigate_to')return[...common,'path.to','target.locationApproach'];if(skillId==='align_to_pallet')return[...common,'target.palletDock'];if(skillId==='retreat')return[...common,'target.retreat'];return common}
   describe(skillId){return{...super.describe(skillId),requiredDomainServices:this.getRequiredDomainServices(skillId),skillIOAdapter:this.ioAdapter.describe(skillId),asyncDomainServices:true,referenceWheelbase:REFERENCE_WHEELBASE}}
@@ -50,7 +50,7 @@ export class MotionBehaviorCloningRuntimeAdapter extends SkillRuntimePolicyAdapt
   }
 
   async learnedRetreat(context){
-    const s=this.state(context),check=this.validateModel('retreat');if(!check.ok)return{ok:false,reason:check.reason};const referenceYaw=s.robot.yaw,target=await this.serviceAsync(context,'target.retreat',s.robot,null),tolerance=this.scaledLength(context,10);
+    const s=this.state(context),check=this.validateModel('retreat');if(!check.ok)return{ok:false,reason:check.reason};const referenceYaw=s.robot.yaw,target=await this.serviceAsync(context,'target.retreat',s.robot),tolerance=this.scaledLength(context,10);
     for(let i=0;i<420;i++){
       const r=s.robot,d=context.domainServices?.has?.('world.distance')?context.domainServices.call('world.distance',r,target):Math.hypot(target.x-r.x,target.y-r.y);if(d<=tolerance){await this.act(context,{type:'stop'});if(context.domainServices?.has?.('agent.markRetreated'))await this.serviceAsync(context,'agent.markRetreated',true);else{s.agent.memory.retreated=true;this.emit(context)}return{ok:true,message:'retreated (learned_bc)',ticks:i,policy:'learned_bc',modelId:check.model.modelId||null}}
       const cmd=this.command('retreat',{target,referenceYaw},context);if(!cmd.ok){await this.act(context,{type:'stop'});return{ok:false,reason:cmd.reason}}const sim=this.control(context),res=await this.act(context,{...cmd.action,dt:sim.dt});if(!res?.ok){await this.act(context,{type:'stop'});return{ok:false,reason:res?.reason||'drive_failed'}}if(!sim.batchMode)await wait(16);
