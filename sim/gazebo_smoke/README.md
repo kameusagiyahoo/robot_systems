@@ -25,9 +25,19 @@
 - `ros_gz_bridge` config
 - robot_systems Python Environment Bridge
 - shell contract checker
-- explicit short drive test
+- direct ROS drive test
+- HTTP Bridge round-trip drive test
 
 The smoke forklift intentionally uses differential drive. It is **not** the final rear-steer forklift dynamics model. `DriveCommandAdapter` is the replacement boundary for Ackermann / rear-steer / ros2_control later.
+
+The Environment Bridge started by this package reports:
+
+```text
+id       = gazebo_smoke_forklift
+fidelity = integration_smoke
+```
+
+so its results cannot be confused with a high-fidelity physics benchmark.
 
 ---
 
@@ -107,7 +117,7 @@ The Bridge maps Gazebo/ROS state into the common `robot_systems.task_runtime_sta
 
 ---
 
-## 5. Terminal C - Contract check
+## 5. Terminal C - Static/runtime contract check
 
 ```bash
 source /opt/ros/jazzy/setup.bash
@@ -131,7 +141,9 @@ If this does not pass, do not debug Planner or Learning yet. Fix the Gazebo/ROS/
 
 ---
 
-## 6. Optional direct drive test
+## 6. Round-trip control tests
+
+### A. Direct ROS test
 
 This deliberately moves the simulated vehicle for about 1.5 seconds:
 
@@ -139,13 +151,38 @@ This deliberately moves the simulated vehicle for about 1.5 seconds:
 bash sim/gazebo_smoke/scripts/drive_once.sh
 ```
 
-Expected behavior:
+This verifies:
 
-1. forklift moves forward in Gazebo
-2. `/odom` position changes
-3. Bridge `/health` remains available
+```text
+ROS command → Gazebo → odom
+```
 
-This isolates Gazebo control from the Browser application.
+### B. Environment Bridge round-trip test
+
+With Gazebo and the Environment Bridge both running:
+
+```bash
+python3 sim/gazebo_smoke/scripts/bridge_drive_test.py
+```
+
+Expected final line:
+
+```text
+PASS: Bridge -> ROS -> Gazebo -> odom -> Bridge round trip
+```
+
+This is the more important gate because it verifies:
+
+```text
+HTTP step
+→ Environment Bridge
+→ ROS command
+→ Gazebo
+→ odom
+→ Environment Bridge observe
+```
+
+Do not continue to Browser debugging until this passes.
 
 ---
 
@@ -170,12 +207,16 @@ In the application:
 3. Bridge URL = `http://127.0.0.1:8000`
 4. Endpoint = `/environment`
 5. press **接続テスト**
-6. confirm remote environment ID is `gazebo_ros2_forklift`
-7. press **保存してRemoteへ切替**
+6. confirm remote environment ID is `gazebo_smoke_forklift`
+7. confirm fidelity is `integration_smoke`
+8. confirm Pose/RGB/LiDAR capability lines are shown
+9. press **保存してRemoteへ切替**
+
+`trialConfiguration` should remain disabled in this first smoke environment unless you explicitly configure a Gazebo SetEntityPose ROS service.
 
 ---
 
-## 8. First end-to-end goal
+## 8. First Browser end-to-end goal
 
 Do not start with pallet manipulation or perception training.
 
@@ -203,7 +244,15 @@ Gazebo forklift moves
 Browser robot state changes
 ```
 
-Use a simple task that resolves to pallet A. The important result is not navigation quality yet; it is that the entire environment boundary works without replacing Planner/Skill code.
+First task to try:
+
+```text
+パレットAを出荷エリアへ運んで
+```
+
+At this stage, if the pipeline stops later at `InsertForks`, that is expected. The smoke environment deliberately does not claim physical pallet manipulation support.
+
+The first success criterion is therefore **NavigateToPallet / Align / Retreat motion reaching Gazebo through the common Environment boundary**, not completion of the full transport task.
 
 ---
 
