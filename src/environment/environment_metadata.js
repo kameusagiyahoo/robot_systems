@@ -8,14 +8,18 @@ export function buildEnvironmentMetadata(environment){
     version:descriptor.version??environment.version??null,
     kind:descriptor.kind||null,
     fidelity:descriptor.fidelity||null,
+    remoteEnvironmentId:descriptor.remoteEnvironmentId||null,
+    remoteEnvironmentLabel:descriptor.remoteEnvironmentLabel||null,
+    remoteEnvironmentVersion:descriptor.remoteEnvironmentVersion??null,
     stateContract:descriptor.stateContract||null,
     nativeRuntime:descriptor.nativeRuntime||null,
     coordinateFrame:descriptor.coordinateFrame||null,
     units:descriptor.units||null,
+    capabilities:descriptor.capabilities||null,
     intendedUse:descriptor.intendedUse||null,
     validation,
     capturedAt:new Date().toISOString()
   };
 }
 
-export function environmentResultMetadata(environment){const d=environment?.describe?.()||{};return{environmentId:d.id||environment?.id||null,environmentVersion:d.version??environment?.version??null,environmentFidelity:d.fidelity||null,stateContract:d.stateContract||null}}
+export function environmentResultMetadata(environment){const d=environment?.describe?.()||{};return{environmentId:d.id||environment?.id||null,environmentVersion:d.version??environment?.version??null,environmentFidelity:d.fidelity||null,remoteEnvironmentId:d.remoteEnvironmentId||null,remoteEnvironmentVersion:d.remoteEnvironmentVersion??null,stateContract:d.stateContract||null}}
