@@ -28,8 +28,8 @@ export function loadSkillEvaluationHistory(id){const v=read(evaluationHistoryKey
 export function saveSkillEvaluation(id,result){const record={...result,skillId:id};write(evaluationKey(id),record);const history=loadSkillEvaluationHistory(id);history.push(record);write(evaluationHistoryKey(id),history.slice(-100));return record}
 export function replaceSkillEvaluationHistory(id,records=[]){const history=(Array.isArray(records)?records:[]).map(r=>({...r,skillId:id})).slice(-100);write(evaluationHistoryKey(id),history);if(history.length)write(evaluationKey(id),history[history.length-1]);else localStorage.removeItem(evaluationKey(id));return history}
 export function clearSkillEvaluation(id){localStorage.removeItem(evaluationKey(id));localStorage.removeItem(evaluationHistoryKey(id))}
-export function latestEvaluationForPolicy(id,policy,controller=null,modelId=null,environmentId=null){
-  const match=e=>e?.policy===policy&&(!controller||e.controller===controller)&&(!modelId||e.modelId===modelId)&&(!environmentId||e.environmentId===environmentId),history=loadSkillEvaluationHistory(id);for(let i=history.length-1;i>=0;i--)if(match(history[i]))return history[i];const latest=loadSkillEvaluation(id);return match(latest)?latest:null;
+export function latestEvaluationForPolicy(id,policy,controller=null,modelId=null,environmentId=null,remoteEnvironmentId=null){
+  const match=e=>e?.policy===policy&&(!controller||e.controller===controller)&&(!modelId||e.modelId===modelId)&&(!environmentId||e.environmentId===environmentId)&&(!remoteEnvironmentId||e.remoteEnvironmentId===remoteEnvironmentId),history=loadSkillEvaluationHistory(id);for(let i=history.length-1;i>=0;i--)if(match(history[i]))return history[i];const latest=loadSkillEvaluation(id);return match(latest)?latest:null;
 }
 export function selectedPolicy(id){const v=localStorage.getItem(policyKey(id));if(v)return v;if(id==='align_to_pallet'&&loadSkillModel(id))return'learned';return'classic'}
 export function setSelectedPolicy(id,policy){localStorage.setItem(policyKey(id),policy)}
